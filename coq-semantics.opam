@@ -1,0 +1,32 @@
+opam-version: "2.0"
+maintainer: "traian.serbanuta@gmail.com"
+version: "dev"
+
+homepage: "https://github.com/traiansf/semantics-in-coq"
+dev-repo: "git+https://github.com/traiansf/semantics-in-coq.git"
+bug-reports: "https://github.com/traiansf/semantics-in-coq/issues"
+license: "MIT"
+
+synopsis: "Coq formalization of various programming language semantics"
+description: """
+Formalization of syntax and verious semantics styles closely following
+the lecture notes of the Fundamentals of Programming Languages class at the
+University of Bucharest (https://cs.unibuc.ro/~asipos/flp/)."""
+
+build: ["dune" "build" "-p" name "-j" jobs]
+depends: [
+  "dune" {>= "2.5"}
+  "coq" {>= "8.15"}
+  "coq-stdpp" {>= "1.8.0"}
+  "coq-itauto"
+  "coq-sets"
+]
+
+tags: [
+  "keyword:logic"
+  "keyword:Programming Languages"
+  "keyword:semantics"
+]
+authors: [
+  "Traian Florin Șerbănuță"
+]
