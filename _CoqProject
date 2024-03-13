@@ -2,3 +2,8 @@
 
 -arg -w -arg -future-coercion-class-field
 
+theories/Semantics/IMP/Syntax.v
+theories/Semantics/IMP/State.v
+theories/Semantics/IMP/Eval.v
+theories/Semantics/IMP/BigStep.v
+theories/Semantics/IMP/SmallStep.v
