@@ -2,7 +2,7 @@ From stdpp Require Import prelude.
 
 Inductive AExp : Type :=
     | AVal : Z -> AExp
-    | var : nat -> AExp
+    | Var : nat -> AExp
     | Plus : AExp -> AExp -> AExp
     | Minus : AExp -> AExp -> AExp
     | Mul : AExp -> AExp -> AExp.

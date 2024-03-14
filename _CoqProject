@@ -8,3 +8,4 @@ theories/Semantics/IMP/Eval.v
 theories/Semantics/IMP/BigStep.v
 theories/Semantics/IMP/SmallStep.v
 theories/Semantics/IMP/Denotational.v
+theories/Semantics/IMP/Algebraic.v

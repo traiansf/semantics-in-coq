@@ -6,7 +6,7 @@ Definition aeval (sigma : State) : AExp -> Z :=
     fix eval (a : AExp) :=
     match a with
     | AVal n => n
-    | var x => sigma x
+    | Var x => sigma x
     | Plus a1 a2 => (eval a1 + eval a2)%Z
     | Minus a1 a2 => (eval a1 - eval a2)%Z
     | Mul a1 a2 => (eval a1 * eval a2)%Z

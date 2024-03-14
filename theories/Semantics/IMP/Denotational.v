@@ -17,9 +17,9 @@ Lemma elem_of_delta: forall (sigma sigma' : State),
     (sigma, sigma') ∈ delta <-> sigma = sigma'.
 Proof. by split; [inversion 1 | intros ->; constructor]. Qed.
 
-Inductive denot_asgn (x : nat) (a : AExp) : Ensemble (State * State) :=
+Inductive denot_asgn (x : nat) (Ra : State -> Z) : Ensemble (State * State) :=
 | dasgn_intro : forall sigma : State,
-    denot_asgn x a (sigma, update sigma x (denota a sigma)).
+    denot_asgn x Ra (sigma, update sigma x (Ra sigma)).
 
 Inductive fwd_relation_composition
     (R Q : Ensemble (State * State)) : Ensemble (State * State) :=
@@ -97,7 +97,7 @@ Qed.
 Fixpoint denotc (c : Cmd) : Ensemble (State * State) :=
 match c with
 | Skip => delta
-| Asgn x a => denot_asgn x a
+| Asgn x a => denot_asgn x (denota a)
 | Seq c0 c1 => fwd_relation_composition (denotc c0) (denotc c1)
 | If b c0 c1 => relation_selector (denotb b) (denotc c0) (denotc c1)
 | While b c => lfp (while_step (denotb b) (denotc c))
@@ -162,8 +162,8 @@ Proof.
     by inversion H'; inversion H''; subst.
 Qed.
 
-Lemma pf_denot_asgn : forall (x : nat) (a : AExp),
-    partial_function (denot_asgn x a).
+Lemma pf_denot_asgn : forall (x : nat) (Ra : State -> Z),
+    partial_function (denot_asgn x Ra).
 Proof.
     intros x a sigma sigma' sigma'' H' H''.
     by inversion H'; inversion H''; subst.
