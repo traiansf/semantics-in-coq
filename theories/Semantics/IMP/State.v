@@ -1,6 +1,6 @@
 From stdpp Require Import prelude.
+From sets Require Import Functions.
 
 Definition State : Type := nat -> Z.
 
-Definition update (sigma : State) (x : nat) (n : Z) (y : nat) : Z :=
-    if decide (y = x) then n else sigma y.
+Definition update: State -> nat -> Z -> State := fn_update.
