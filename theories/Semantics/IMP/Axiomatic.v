@@ -1,5 +1,5 @@
 From stdpp Require Import prelude.
-From Coq Require Import Classical.
+From Coq Require Import Classical FunctionalExtensionality.
 From sets Require Import Functions Ensemble.
 
 From Semantics Require Import Syntax State Denotational.
@@ -566,4 +566,81 @@ Proof.
 Qed.
 
 End sec_Hoare_logic_example.
-    
+
+Lemma eaeval_subst_loc :
+  forall (sigma I : State) (e : EAExp) (x : nat) (a : AExp),
+  eaeval sigma I (asubst e subst0 (mk_subst [(x, a)]))
+    =
+  eaeval (State.update sigma x (denota a sigma)) I e.
+Proof.
+  induction e; intros.
+  - done.
+  - done.
+  - cbn. unfold State.update, fn_update.
+    case_decide; cbn; [| done].
+    by apply eaeval_aexp.
+  - by cbn; rewrite <- IHe1, <- IHe2.
+  - by cbn; rewrite <- IHe1, <- IHe2.
+  - by cbn; rewrite <- IHe1, <- IHe2.
+Qed.
+
+Lemma satsi_subst_loc :
+  forall (sigma I : State) (e : EBExp) (x : nat) (a : AExp),
+  satsi sigma I (bsubst e subst0 (mk_subst [(x, a)]))
+    <->
+  satsi (State.update sigma x (denota a sigma)) I e.
+Proof.
+  intros sigma I e; revert I; induction e; intros.
+  - done.
+  - by cbn; rewrite !satsi_eq, <- !eaeval_subst_loc.
+  - by cbn; rewrite !satsi_le, <- !eaeval_subst_loc.
+  - by cbn; rewrite !satsi_not, <- IHe.
+  - by cbn; rewrite !satsi_and, <- IHe1, <- IHe2.
+  - by cbn; rewrite !satsi_or, <- IHe1, <- IHe2.
+  - cbn; rewrite !satsi_forall.
+    apply forall_proper; intro z.
+    rewrite <- IHe.
+    cut (fn_update subst0 n None = subst0); [by intros ->|].
+    extensionality y.
+    by unfold fn_update; case_decide.
+Qed.
+
+Theorem ht_soundness : forall (A B : EBExp) (c : Cmd),
+    ht_ded A c B -> ht_sat (ht A c B).
+Proof.
+    intros * Hht I. apply ht_sati_alt.
+    induction Hht; cbn in *; intros sigma sigma' Hdenot Hpre.
+    - by inversion Hdenot; subst.
+    - inversion Hdenot; subst.
+      by apply satsi_subst_loc.
+    - inversion Hdenot; subst.
+      eapply IHHht2; [done |]; cbn.
+      by eapply IHHht1.
+    - inversion Hdenot; subst.
+      + eapply IHHht1; [done |].
+        apply satsi_and.
+        split; [done |].
+        by apply satsi_eval.
+      + eapply IHHht2; [done |].
+        rewrite satsi_and, satsi_not, satsi_eval.
+        split; [done |].
+        by rewrite H1.
+    - pose (W (ss' : State * State) := satsi ss'.1 I A -> satsi ss'.2 I (EAnd A (ENot b))).
+      cut (lfp (while_step (denotb b) (denotc c)) ⊆ W);
+        [by intros Hincl; apply Hincl in Hdenot; apply Hdenot |].
+      apply knaster_tarski_least_pre_fixpoint.
+      clear -IHHht.
+      intros (sigma, sigma').
+      unfold while_step.
+      rewrite elem_of_relation_selector, elem_of_fwd_relation_composition.
+      intros [(Hb & sigma'' & Hc & Hw)|[Hb Hdelta]] Hsigma.
+      + eapply Hw, IHHht; [done |].
+        apply satsi_and; split; [done |].
+        by apply satsi_eval.
+      + inversion Hdelta; subst; cbn in *.
+        rewrite satsi_and, satsi_not; split; [done |].
+        by rewrite satsi_eval, Hb.
+    - eapply classical_satsi_impl; [by apply H0 |].
+      eapply IHHht; [done |].
+      by eapply classical_satsi_impl; [apply H |].
+Qed.
