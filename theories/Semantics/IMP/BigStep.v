@@ -3,26 +3,30 @@ From Coq Require Import Classical ClassicalFacts.
 
 From Semantics Require Import Syntax State Eval.
 
-Inductive big_step_proof : Cmd -> State -> State -> Type :=
-| bs_skip : forall sigma : State, big_step_proof Skip sigma sigma
-| bs_asgn : forall (x : nat) (a : AExp) (sigma : State),
+Section sec_big_step.
+
+Context `{EqDecision L}.
+
+Inductive big_step_proof : Cmd L -> State L -> State L -> Type :=
+| bs_skip : forall sigma : State L, big_step_proof Skip sigma sigma
+| bs_asgn : forall (x : L) (a : AExp L) (sigma : State L),
     big_step_proof (Asgn x a) sigma (update sigma x (aeval sigma a))
-| bs_seq : forall (c0 c1 : Cmd) (sigma sigma' sigma'' : State),
+| bs_seq : forall (c0 c1 : Cmd L) (sigma sigma' sigma'' : State L),
     big_step_proof c0 sigma sigma'' ->
     big_step_proof c1 sigma'' sigma' ->
     big_step_proof (Seq c0 c1) sigma sigma'
-| bs_if_true : forall (b : BExp) (c0 c1 : Cmd) (sigma sigma' : State),
+| bs_if_true : forall (b : BExp L) (c0 c1 : Cmd L) (sigma sigma' : State L),
     beval sigma b = true ->
     big_step_proof c0 sigma sigma' ->
     big_step_proof (If b c0 c1) sigma sigma'
-| bs_if_false : forall (b : BExp) (c0 c1 : Cmd) (sigma sigma' : State),
+| bs_if_false : forall (b : BExp L) (c0 c1 : Cmd L) (sigma sigma' : State L),
     beval sigma b = false ->
     big_step_proof c1 sigma sigma' ->
     big_step_proof (If b c0 c1) sigma sigma'
-| bs_while_false : forall (b : BExp) (c : Cmd) (sigma : State),
+| bs_while_false : forall (b : BExp L) (c : Cmd L) (sigma : State L),
     beval sigma b = false ->
     big_step_proof (While b c) sigma sigma
-| bs_while_true : forall (b : BExp) (c : Cmd) (sigma sigma' sigma'' : State),
+| bs_while_true : forall (b : BExp L) (c : Cmd L) (sigma sigma' sigma'' : State L),
     beval sigma b = true ->
     big_step_proof c sigma sigma'' ->
     big_step_proof (While b c) sigma'' sigma' ->
@@ -41,8 +45,8 @@ match proof with
 end.
 
 Lemma bsp_while_true_skip_argument :
-    forall (sigma0 sigma' : State) (bs0 : big_step_proof (While (BVal true) Skip) sigma0 sigma'),
-    exists (sigma1 : State) (bs1 : big_step_proof (While (BVal true) Skip) sigma1 sigma'),
+    forall (sigma0 sigma' : State L) (bs0 : big_step_proof (While (BVal true) Skip) sigma0 sigma'),
+    exists (sigma1 : State L) (bs1 : big_step_proof (While (BVal true) Skip) sigma1 sigma'),
     bsp_depth bs1 < bsp_depth bs0.
 Proof.
     intros *.
@@ -50,13 +54,13 @@ Proof.
     exists sigma1, bs1; cbn; lia.
 Qed.
 
-Inductive big_step (c : Cmd) (sigma sigma' : State) : Prop :=
+Inductive big_step (c : Cmd L) (sigma sigma' : State L) : Prop :=
     big_step_proof_inh : big_step_proof c sigma sigma' -> big_step c sigma sigma'.
 
-Lemma classical_big_step_while_true_skip : forall (sigma sigma' : State),
+Lemma classical_big_step_while_true_skip : forall (sigma sigma' : State L),
     ~ big_step (While (BVal true) Skip) sigma sigma'.
 Proof.
-    pose (P (n : nat) := exists (sigma sigma' : State) (Hbs: big_step_proof (While (BVal true) Skip) sigma sigma'), n = bsp_depth Hbs).
+    pose (P (n : nat) := exists (sigma sigma' : State L) (Hbs: big_step_proof (While (BVal true) Skip) sigma sigma'), n = bsp_depth Hbs).
     intros sigma sigma' [Hbs].
     assert (HP : P (bsp_depth Hbs)) by (eexists _, _, _; done).
     destruct (excluded_middle_entails_unrestricted_minimization classic P _ HP)
@@ -67,11 +71,11 @@ Proof.
     by eexists _, _, _.
 Qed.
 
-Definition bs_equivalence (c0 c1 : Cmd) : Prop :=
-    forall (sigma sigma' : State),
+Definition bs_equivalence (c0 c1 : Cmd L) : Prop :=
+    forall (sigma sigma' : State L),
         big_step c0 sigma sigma' <-> big_step c1 sigma sigma'.
 
-Lemma bs_loop_unrolling: forall (b : BExp) (c : Cmd),
+Lemma bs_loop_unrolling: forall (b : BExp L) (c : Cmd L),
     bs_equivalence (While b c) (If b (Seq c (While b c)) Skip).
 Proof.
   intros; split; intros [Hw]; inversion Hw; subst; constructor.
@@ -82,3 +86,5 @@ Proof.
   - inversion X; subst.
     by apply bs_while_false.
 Qed.
+
+End sec_big_step.

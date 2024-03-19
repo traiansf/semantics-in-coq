@@ -2,27 +2,31 @@ From stdpp Require Import prelude.
 
 From Semantics Require Import Syntax State Eval BigStep.
 
-Inductive one_step : relation (Cmd * State) :=
-| os_asgn : forall (x : nat) (a : AExp) (sigma : State),
+Section sec_small_step.
+
+Context `{EqDecision L}.
+
+Inductive one_step : relation (Cmd L * State L) :=
+| os_asgn : forall (x : L) (a : AExp L) (sigma : State L),
     one_step (Asgn x a, sigma) (Skip, update sigma x (aeval sigma a))
-| os_seq : forall (c1 : Cmd) (sigma : State),
+| os_seq : forall (c1 : Cmd L) (sigma : State L),
     one_step (Seq Skip c1, sigma) (c1, sigma)
-| os_seq_struct : forall (c0 c0' c1 : Cmd) (sigma sigma' : State),
+| os_seq_struct : forall (c0 c0' c1 : Cmd L) (sigma sigma' : State L),
     one_step (c0, sigma) (c0', sigma') ->
     one_step (Seq c0 c1, sigma) (Seq c0' c1, sigma')
-| os_if_true : forall (b : BExp) (c0 c1 : Cmd) (sigma : State),
+| os_if_true : forall (b : BExp L) (c0 c1 : Cmd L) (sigma : State L),
     beval sigma b = true ->
     one_step (If b c0 c1, sigma) (c0, sigma)
-| os_if_false : forall (b : BExp) (c0 c1 : Cmd) (sigma : State),
+| os_if_false : forall (b : BExp L) (c0 c1 : Cmd L) (sigma : State L),
     beval sigma b = false ->
     one_step (If b c0 c1, sigma) (c1, sigma)
-| os_while : forall (b : BExp) (c : Cmd) (sigma : State),
+| os_while : forall (b : BExp L) (c : Cmd L) (sigma : State L),
     one_step (While b c, sigma) (If b (Seq c (While b c)) Skip, sigma)
 .
 
-Definition small_step : relation (Cmd * State) := rtc one_step.
+Definition small_step : relation (Cmd L * State L) := rtc one_step.
 
-Lemma small_step_seq_iter : forall (c0 c1 : Cmd) (sigma sigma' : State),
+Lemma small_step_seq_iter : forall (c0 c1 : Cmd L) (sigma sigma' : State L),
     small_step (c0, sigma) (Skip, sigma') ->
     small_step (Seq c0 c1, sigma) (c1, sigma').
 Proof.
@@ -37,16 +41,16 @@ Proof.
       + by apply IHHss.
 Qed.
 
-Lemma small_step_skip : forall (c' : Cmd) (sigma sigma' : State),
+Lemma small_step_skip : forall (c' : Cmd L) (sigma sigma' : State L),
     small_step (Skip, sigma) (c', sigma') -> c' = Skip /\ sigma = sigma'.
 Proof.
     by intros *; inversion 1 as [| ? ? ? Hss]; subst; [| inversion Hss].
 Qed.
 
 
-Lemma n_small_steps_seq_rev  : forall (n : nat) (c0 c1 : Cmd) (sigma sigma' : State),
+Lemma n_small_steps_seq_rev  : forall (n : nat) (c0 c1 : Cmd L) (sigma sigma' : State L),
     nsteps one_step n (Seq c0 c1, sigma) (Skip, sigma') ->
-    exists (sigma'' : State) (n0 n1 : nat),
+    exists (sigma'' : State L) (n0 n1 : nat),
         nsteps one_step n0 (c0, sigma) (Skip, sigma'') /\
         nsteps one_step n1 (c1, sigma'') (Skip, sigma') /\
         n0 + n1 < n.
@@ -58,9 +62,9 @@ Proof.
       exists sigma'', (S n0'), n1; split_and!; [by econstructor | done | by lia].
 Qed.
 
-Lemma small_step_seq_rev : forall (c0 c1 : Cmd) (sigma sigma' : State),
+Lemma small_step_seq_rev : forall (c0 c1 : Cmd L) (sigma sigma' : State L),
     small_step (Seq c0 c1, sigma) (Skip, sigma') ->
-    exists (sigma'' : State),
+    exists (sigma'' : State L),
         small_step (c0, sigma) (Skip, sigma'') /\
         small_step (c1, sigma'') (Skip, sigma').
 Proof.
@@ -71,7 +75,7 @@ Proof.
 Qed.
 
 
-Lemma small_step_equiv_big_step : forall (c : Cmd) (sigma sigma' : State),
+Lemma small_step_equiv_big_step : forall (c : Cmd L) (sigma sigma' : State L),
     big_step c sigma sigma' <-> small_step (c, sigma) (Skip, sigma').
 Proof.
     split.
@@ -117,3 +121,4 @@ Proof.
           by constructor; apply bs_while_false.
 Qed.
 
+End sec_small_step.

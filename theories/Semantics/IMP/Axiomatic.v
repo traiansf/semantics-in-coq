@@ -4,15 +4,44 @@ From sets Require Import Functions Ensemble.
 
 From Semantics Require Import Syntax State Denotational.
 
-Inductive EAExp : Type :=
-    | LVar : nat -> EAExp
-    | EAVal : Z -> EAExp
-    | EVar : nat -> EAExp
-    | EPlus : EAExp -> EAExp -> EAExp
-    | EMinus : EAExp -> EAExp -> EAExp
-    | EMul : EAExp -> EAExp -> EAExp.
+Inductive EAExp (L V : Type) : Type :=
+    | LVar : V -> EAExp L V
+    | EAVal : Z -> EAExp L V
+    | EVar : L -> EAExp L V
+    | EPlus : EAExp L V -> EAExp L V -> EAExp L V
+    | EMinus : EAExp L V -> EAExp L V -> EAExp L V
+    | EMul : EAExp L V -> EAExp L V -> EAExp L V.
 
-Fixpoint aexp_to_eaexp (a : AExp) : EAExp :=
+Arguments LVar {L V}%type_scope _ : assert.
+Arguments EAVal {L V}%type_scope _%Z_scope : assert.
+Arguments EVar {L V}%type_scope _%nat_scope : assert.
+Arguments EPlus {L V}%type_scope _ _ : assert.
+Arguments EMinus {L V}%type_scope _ _ : assert.
+Arguments EMul {L V}%type_scope _ _ : assert.
+
+Inductive EBExp (L V : Type) : Type :=
+    | EBVal : bool -> EBExp L V
+    | EAEq : EAExp L V -> EAExp L V -> EBExp L V
+    | EALe : EAExp L V -> EAExp L V -> EBExp L V
+    | ENot : EBExp L V -> EBExp L V
+    | EAnd : EBExp L V -> EBExp L V -> EBExp L V
+    | EOr : EBExp L V -> EBExp L V -> EBExp L V
+    | Forall : V -> EBExp L V -> EBExp L V
+    .
+
+Arguments EBVal {L V}%type_scope _%bool_scope : assert.
+Arguments EAEq {L V}%type_scope _ _ : assert.
+Arguments EALe {L V}%type_scope _ _ : assert.
+Arguments ENot {L V}%type_scope _ : assert.
+Arguments EAnd {L V}%type_scope _ _ : assert.
+Arguments EOr {L V}%type_scope _ _ : assert.
+Arguments Forall {L V}%type_scope _ _ : assert.
+
+Section sec_axiomatic.
+
+Context `{EqDecision L} `{EqDecision V}.
+
+Fixpoint aexp_to_eaexp (a : AExp L) : EAExp L V :=
   match a with
   | AVal z => EAVal z
   | Var x => EVar x
@@ -21,7 +50,7 @@ Fixpoint aexp_to_eaexp (a : AExp) : EAExp :=
   | Mul a1 a2 => EMul (aexp_to_eaexp a1)  (aexp_to_eaexp a2)
   end.
 
-Fixpoint aloc_vars (a : EAExp) : Ensemble nat :=
+Fixpoint aloc_vars (a : EAExp L V) : Ensemble L :=
   match a with
   | EAVal z => ∅
   | EVar x => {[x]}
@@ -31,7 +60,7 @@ Fixpoint aloc_vars (a : EAExp) : Ensemble nat :=
   | EMul a1 a2 => aloc_vars a1 ∪ aloc_vars a2
   end.
 
-Fixpoint alog_vars (a : EAExp) : Ensemble nat :=
+Fixpoint alog_vars (a : EAExp L V) : Ensemble V :=
   match a with
   | EAVal z => ∅
   | EVar x => ∅
@@ -41,22 +70,12 @@ Fixpoint alog_vars (a : EAExp) : Ensemble nat :=
   | EMul a1 a2 => alog_vars a1 ∪ alog_vars a2
   end.
 
-Coercion aexp_to_eaexp : AExp >-> EAExp.
+#[local] Coercion aexp_to_eaexp : AExp >-> EAExp.
 
-Inductive EBExp : Type :=
-    | EBVal : bool -> EBExp
-    | EAEq : EAExp -> EAExp -> EBExp
-    | EALe : EAExp -> EAExp -> EBExp
-    | ENot : EBExp -> EBExp
-    | EAnd : EBExp -> EBExp -> EBExp
-    | EOr : EBExp -> EBExp -> EBExp
-    | Forall : nat -> EBExp -> EBExp
-    .
-
-Definition eimpl (b1 b2: EBExp) : EBExp :=
+Definition eimpl (b1 b2: EBExp L V) : EBExp L V :=
   EOr (ENot b1) b2.
 
-Fixpoint bexp_to_ebexp (b : BExp) : EBExp :=
+Fixpoint bexp_to_ebexp (b : BExp L) : EBExp L V :=
   match b with
   | BVal t => EBVal t
   | AEq a1 a2 => EAEq  (aexp_to_eaexp a1)  (aexp_to_eaexp a2)
@@ -66,7 +85,7 @@ Fixpoint bexp_to_ebexp (b : BExp) : EBExp :=
   | Or b1 b2 => EOr (bexp_to_ebexp b1) (bexp_to_ebexp b2)
   end.
 
-Fixpoint bloc_vars (b : EBExp) : Ensemble nat :=
+Fixpoint bloc_vars (b : EBExp L V) : Ensemble L :=
   match b with
   | EBVal t => ∅
   | EAEq a1 a2 => aloc_vars a1 ∪ aloc_vars a2
@@ -77,7 +96,7 @@ Fixpoint bloc_vars (b : EBExp) : Ensemble nat :=
   | Forall x b => bloc_vars b
   end.
 
-Fixpoint blog_vars (b : EBExp) : Ensemble nat :=
+Fixpoint blog_vars (b : EBExp L V) : Ensemble V :=
   match b with
   | EBVal t => ∅
   | EAEq a1 a2 => alog_vars a1 ∪ alog_vars a2
@@ -88,12 +107,12 @@ Fixpoint blog_vars (b : EBExp) : Ensemble nat :=
   | Forall x b => blog_vars b ∖ {[x]}
   end.
 
-Coercion bexp_to_ebexp : BExp >-> EBExp.
+#[local] Coercion bexp_to_ebexp : BExp >-> EBExp.
 
-Definition substitution : Type := nat -> option AExp.
+Definition substitution (T : Type) : Type := T -> option (AExp L).
 
-Definition asubst (a : EAExp) (logv : substitution) (locv : substitution) : EAExp :=
-  (fix go (a : EAExp) :EAExp :=
+Definition asubst (a : EAExp L V) (logv : substitution V) (locv : substitution L) : EAExp L V :=
+  (fix go (a : EAExp L V) : EAExp L V :=
   match a with
   | LVar x => default (LVar x) (aexp_to_eaexp <$> logv x)
   | EAVal z => EAVal z
@@ -103,7 +122,7 @@ Definition asubst (a : EAExp) (logv : substitution) (locv : substitution) : EAEx
   | EMul a1 a2 => EMul (go a1)  (go a2)
   end) a.
 
-Fixpoint bsubst  (b : EBExp) (logv locv : substitution) : EBExp :=
+Fixpoint bsubst  (b : EBExp L V) (logv : substitution V) (locv : substitution L) : EBExp L V :=
   match b with
   | EBVal t => EBVal t
   | EAEq a1 a2 => EAEq (asubst a1 logv locv) (asubst a2 logv locv)
@@ -114,20 +133,21 @@ Fixpoint bsubst  (b : EBExp) (logv locv : substitution) : EBExp :=
   | Forall x b => Forall x (bsubst b (fn_update logv x None) locv)
   end.
 
-Definition subst0 : substitution := const None.
+Definition subst0 {T : Type} : substitution T := const None.
 
-Definition update (subst : substitution) (sub : list (nat * AExp)) : substitution :=
+Definition update `{EqDecision T} (subst : substitution T) (sub : list (T * AExp L)) : substitution T :=
   foldr (fun p s => fn_update s p.1 (Some p.2)) subst sub.
 
-Definition mk_subst := update subst0.
+Definition mk_subst `{EqDecision T} := @update T _ subst0.
 
-Definition subst_vars (s : substitution) : Ensemble nat :=
-    fun (x : nat) => is_Some (s x).
+Definition subst_vars `(s : substitution T) : Ensemble T :=
+    fun (x : T) => is_Some (s x).
 
-Lemma subst_vars0 : subst_vars subst0 ≡ ∅.
+Lemma subst_vars0 {T} : subst_vars (@subst0 T) ≡ ∅.
 Proof. by apply equiv_empty; intros x [a Hx]. Qed.
 
-Lemma subst_vars_fn_update_Some : forall (s : substitution) (x : nat) (a : AExp),
+Lemma subst_vars_fn_update_Some `{EqDecision T}:
+    forall (s : substitution T) (x : T) (a : AExp L),
     subst_vars (fn_update s x (Some a)) ≡ subst_vars s ∪ {[x]}.
 Proof.
     intros; intro y; rewrite elem_of_union, elem_of_singleton.
@@ -141,16 +161,17 @@ Proof.
       + by exists a; rewrite fn_update_eq.
 Qed.
 
-Lemma subst_vars_update : forall (s : substitution) (sub : list (nat * AExp)),
+Lemma subst_vars_update `{EqDecision T} :
+    forall (s : substitution T) (sub : list (T * AExp L)),
     subst_vars (update s sub) ≡ subst_vars s ∪ list_to_set (map fst sub).
 Proof.
     intros *; revert s; induction sub; [by set_solver |].
     intro s; cbn.
-    rewrite subst_vars_fn_update_Some, IHsub.
+    unfold update in IHsub; rewrite subst_vars_fn_update_Some, IHsub.
     by set_solver.
 Qed.
 
-Lemma subst_vars_mk_subst : forall (sub : list (nat * AExp)),
+Lemma subst_vars_mk_subst `{EqDecision T}: forall (sub : list (T * AExp L)),
     subst_vars (mk_subst sub) ≡ list_to_set (map fst sub).
 Proof.
     intros; unfold mk_subst.
@@ -158,22 +179,23 @@ Proof.
     by set_solver.
 Qed.
 
-Lemma asubst_id : forall (a : EAExp) (slog sloc : substitution),
+Lemma asubst_id :
+    forall (a : EAExp L V) (slog : substitution V) (sloc : substitution L),
     aloc_vars a ∩ subst_vars sloc ≡ ∅ ->
     alog_vars a ∩ subst_vars slog ≡ ∅ ->
     asubst a slog sloc = a.
 Proof.
     intros *; induction a; intros Hloc Hlog.
-    - cbn; cut (slog n = None); [by intros -> |].
+    - cbn; cut (slog v = None); [by intros -> |].
       cbn in Hlog.
-      assert (Hn : n ∉ subst_vars slog) by set_solver.
-      destruct (slog n) eqn:Hslog; [| done].
+      assert (Hn : v ∉ subst_vars slog) by set_solver.
+      destruct (slog v) eqn:Hslog; [| done].
       by contradict Hn; eexists.
     - done.
-    - cbn; cut (sloc n = None); [by intros -> |].
+    - cbn; cut (sloc l = None); [by intros -> |].
       cbn in Hloc.
-      assert (Hn : n ∉ subst_vars sloc) by set_solver.
-      destruct (sloc n) eqn:Hslog; [| done].
+      assert (Hn : l ∉ subst_vars sloc) by set_solver.
+      destruct (sloc l) eqn:Hslog; [| done].
       by contradict Hn; eexists.
     - cbn; setoid_rewrite IHa1; [| by set_solver..].
       by setoid_rewrite IHa2; [| set_solver..].
@@ -183,7 +205,7 @@ Proof.
       by setoid_rewrite IHa2; [| set_solver..].
 Qed.
 
-Lemma bsubst_id : forall (b : EBExp) (slog sloc : substitution),
+Lemma bsubst_id : forall (b : EBExp L V) (slog : substitution V) (sloc : substitution L),
     bloc_vars b ∩ subst_vars sloc ≡ ∅ ->
     blog_vars b ∩ subst_vars slog ≡ ∅ ->
     bsubst b slog sloc = b.
@@ -206,8 +228,8 @@ Proof.
       by split_and!; [..| eexists].
 Qed.
 
-Definition eaeval (sigma : State) (I : nat -> Z): EAExp -> Z :=
-    fix eval (a : EAExp) :=
+Definition eaeval (sigma : State L) (I : State V): EAExp L V -> Z :=
+    fix eval (a : EAExp L V) :=
     match a with
     | LVar x => I x
     | EAVal n => n
@@ -217,7 +239,7 @@ Definition eaeval (sigma : State) (I : nat -> Z): EAExp -> Z :=
     | EMul a1 a2 => (eval a1 * eval a2)%Z
     end.
 
-Lemma eaeval_aexp: forall (a : AExp) (sigma : State) (I : nat -> Z),
+Lemma eaeval_aexp: forall (a : AExp L) (sigma : State L) (I : State V),
     eaeval sigma I a = denota a sigma.
 Proof.
     intros.
@@ -250,7 +272,7 @@ Proof.
     by intro contra; apply contra.
 Qed.
 
-Fixpoint satsi_set (sigma I : State) (b : EBExp) : Ensemble True :=
+Fixpoint satsi_set (sigma : State L) (I : State V) (b : EBExp L V) : Ensemble True :=
 match b with
 | EBVal true => top True
 | EBVal false => ∅
@@ -262,19 +284,19 @@ match b with
 | Forall x b => indexed_intersection (fun z : Z => satsi_set sigma (fn_update I x z) b)
 end.
 
-Definition satsi (sigma I : State) (b : EBExp) : Prop :=
+Definition satsi (sigma : State L) (I : State V) (b : EBExp L V) : Prop :=
     satsi_set sigma I b ≡ top True.
 
-Lemma satsi_true : forall (sigma I : State), satsi sigma I (BVal true).
+Lemma satsi_true : forall (sigma : State L) (I : State V), satsi sigma I (BVal true).
 Proof. done. Qed.
 
-Lemma satsi_false : forall (sigma I : State), ~ satsi sigma I (BVal false).
+Lemma satsi_false : forall (sigma : State L) (I : State V), ~ satsi sigma I (BVal false).
 Proof.
     intros sigma Interp; unfold satsi; cbn.
     by intro contra; apply top_not_bottom.
 Qed.
 
-Lemma satsi_eq : forall (sigma I : State) (a1 a2 : EAExp),
+Lemma satsi_eq : forall (sigma : State L) (I : State V) (a1 a2 : EAExp L V),
     satsi sigma I (EAEq a1 a2) <-> eaeval sigma I a1 = eaeval sigma I a2.
 Proof.
     unfold satsi; cbn; split; intros; case_decide.
@@ -284,7 +306,7 @@ Proof.
     - done.
 Qed.
 
-Lemma satsi_le : forall (sigma I : State) (a1 a2 : EAExp),
+Lemma satsi_le : forall (sigma : State L) (I : State V) (a1 a2 : EAExp L V),
     satsi sigma I (EALe a1 a2) <-> (eaeval sigma I a1 <= eaeval sigma I a2)%Z.
 Proof.
     unfold satsi; cbn; split; intros; case_decide.
@@ -294,34 +316,34 @@ Proof.
     - done.
 Qed.
 
-Lemma satsi_not : forall (sigma I : State) (b : EBExp),
+Lemma satsi_not : forall (sigma : State L) (I : State V) (b : EBExp L V),
     satsi sigma I (ENot b) <-> ~ satsi sigma I b.
 Proof.
     intros; unfold satsi; cbn.
     by rewrite !top_char, elem_of_complement.
 Qed.
 
-Lemma satsi_and_intro : forall (sigma I : State) (b1 b2 : EBExp),
+Lemma satsi_and_intro : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
      satsi sigma I b1 -> satsi sigma I b2 -> satsi sigma I (EAnd b1 b2).
 Proof. by set_solver. Qed.
 
-Lemma satsi_and_elim_l : forall (sigma I : State) (b1 b2 : EBExp),
+Lemma satsi_and_elim_l : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
     satsi sigma I (EAnd b1 b2) -> satsi sigma I b1. 
 Proof. by set_solver. Qed.
 
-Lemma satsi_and_elim_r : forall (sigma I : State) (b1 b2 : EBExp),
+Lemma satsi_and_elim_r : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
     satsi sigma I (EAnd b1 b2) -> satsi sigma I b2. 
 Proof. by set_solver. Qed.
 
-Lemma satsi_and : forall (sigma I : State) (b1 b2 : EBExp),
+Lemma satsi_and : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
     satsi sigma I (EAnd b1 b2) <-> satsi sigma I b1 /\ satsi sigma I b2.
 Proof. by set_solver. Qed.
 
-Lemma satsi_or : forall (sigma I : State) (b1 b2 : EBExp),
+Lemma satsi_or : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
     satsi sigma I (EOr b1 b2) <-> satsi sigma I b1 \/ satsi sigma I b2.
 Proof. by intros; unfold satsi; cbn; rewrite !top_char, elem_of_union. Qed.
 
-Lemma satsi_forall : forall (sigma I : State) (x : nat) (b : EBExp),
+Lemma satsi_forall : forall (sigma : State L) (I : State V) (x : V) (b : EBExp L V),
     satsi sigma I (Forall x b) <-> forall (z : Z), satsi sigma (fn_update I x z) b.
 Proof.
     intros; unfold satsi; cbn.
@@ -329,7 +351,7 @@ Proof.
     by rewrite elem_of_indexed_intersection.
 Qed.
 
-Lemma satsi_mp :  forall (sigma I : State) (b1 b2 : EBExp),
+Lemma satsi_mp :  forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
     satsi sigma I (eimpl b1 b2) -> satsi sigma I b1 -> satsi sigma I b2.
 Proof.
     intros *; unfold eimpl.
@@ -337,7 +359,7 @@ Proof.
     by intros [].
 Qed.
 
-Lemma classical_satsi_impl :  forall (sigma I : State) (b1 b2 : EBExp),
+Lemma classical_satsi_impl :  forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
     satsi sigma I (eimpl b1 b2) <-> (satsi sigma I b1 -> satsi sigma I b2).
 Proof.
     split; [by apply satsi_mp |].
@@ -349,7 +371,7 @@ Proof.
     - by left.
 Qed.
 
-Lemma satsi_eval : forall (sigma I : State) (b : BExp),
+Lemma satsi_eval : forall (sigma : State L) (I : State V) (b : BExp L),
     satsi sigma I b <-> denotb b sigma = true.
 Proof.
     intros; induction b.
@@ -374,31 +396,31 @@ Proof.
       by rewrite orb_true_iff.
 Qed.
 
-Definition sat (b : EBExp) : Prop :=
-    forall (sigma I : State), satsi sigma I b.
+Definition sat (b : EBExp L V) : Prop :=
+    forall (sigma : State L) (I : State V), satsi sigma I b.
 
-Definition sem (I : State) (A : EBExp) : Ensemble State :=
-    fun (sigma : State) => satsi sigma I A.
+Definition sem (I : State V) (A : EBExp L V) : Ensemble (State L) :=
+    fun (sigma : State L) => satsi sigma I A.
 
 Record HoareTriple : Type := ht
 {
-    pre_condition : EBExp;
-    command : Cmd;
-    post_condition : EBExp;
+    pre_condition : EBExp L V;
+    command : Cmd L;
+    post_condition : EBExp L V;
 }.
 
-Definition ht_satsi (sigma I : State) (t : HoareTriple) : Prop :=
+Definition ht_satsi (sigma : State L) (I : State V) (t : HoareTriple) : Prop :=
     satsi sigma I (pre_condition t) ->
-    forall (sigma' : State), (sigma, sigma') ∈ denotc (command t) ->
+    forall (sigma' : State L), (sigma, sigma') ∈ denotc (command t) ->
     satsi sigma' I (post_condition t).
 
-Definition ht_sati (I : State) (t : HoareTriple) : Prop :=
-    forall (sigma : State), ht_satsi sigma I t.
+Definition ht_sati (I : State V) (t : HoareTriple) : Prop :=
+    forall (sigma : State L), ht_satsi sigma I t.
 
-Lemma ht_sati_alt: forall (I : State) (t : HoareTriple),
+Lemma ht_sati_alt: forall (I : State V) (t : HoareTriple),
     ht_sati I t
       <->
-    forall (sigma sigma' : State), (sigma, sigma') ∈ denotc (command t) ->
+    forall (sigma sigma' : State L), (sigma, sigma') ∈ denotc (command t) ->
     satsi sigma I (pre_condition t) ->
     satsi sigma' I (post_condition t).
 Proof.
@@ -407,28 +429,28 @@ Proof.
 Qed.
 
 Definition ht_sat (t : HoareTriple) : Prop :=
-    forall (I : State), ht_sati I t.
+    forall (I : State V), ht_sati I t.
 
-Inductive ht_ded : EBExp -> Cmd -> EBExp -> Prop :=
-| ht_skip : forall (B : EBExp), ht_ded B Skip B
-| ht_asgn : forall (B : EBExp) (x : nat) (a : AExp),
-    ht_ded (bsubst B subst0 (mk_subst [(x, a)])) (Asgn x a) B
-| ht_seq : forall (A B C : EBExp) (c0 c1 : Cmd),
-    ht_ded A c0 B -> ht_ded B c1 C -> ht_ded A (Seq c0 c1) C
-| ht_if : forall (A B : EBExp) (b : BExp) (c0 c1 : Cmd),
-    ht_ded (EAnd A b) c0 B -> ht_ded (EAnd A (ENot b)) c1 B ->
-    ht_ded A (If b c0 c1) B
-| ht_while : forall (A : EBExp) (b : BExp) (c : Cmd),
-    ht_ded (EAnd A b) c A ->
-    ht_ded A (While b c) (EAnd A (ENot b))
-| ht_cons : forall (A A' B B' : EBExp) (c : Cmd),
-    sat (eimpl A A') -> ht_ded A' c B' -> sat (eimpl B' B) ->
-    ht_ded A c B
+Inductive ht_ded : HoareTriple -> Prop :=
+| ht_skip : forall (B : EBExp L V), ht_ded (ht B Skip B)
+| ht_asgn : forall (B : EBExp L V) (x : L) (a : AExp L),
+    ht_ded (ht (bsubst B subst0 (mk_subst [(x, a)])) (Asgn x a) B)
+| ht_seq : forall (A B C : EBExp L V) (c0 c1 : Cmd L),
+    ht_ded (ht A c0 B) -> ht_ded (ht B c1 C) -> ht_ded (ht A (Seq c0 c1) C)
+| ht_if : forall (A B : EBExp L V) (b : BExp L) (c0 c1 : Cmd L),
+    ht_ded (ht (EAnd A b) c0 B) -> ht_ded (ht (EAnd A (ENot b)) c1 B) ->
+    ht_ded (ht A (If b c0 c1) B)
+| ht_while : forall (A : EBExp L V) (b : BExp L) (c : Cmd L),
+    ht_ded (ht (EAnd A b) c A) ->
+    ht_ded (ht A (While b c) (EAnd A (ENot b)))
+| ht_cons : forall (A A' B B' : EBExp L V) (c : Cmd L),
+    sat (eimpl A A') -> ht_ded (ht A' c B') -> sat (eimpl B' B) ->
+    ht_ded (ht A c B)
 . 
 
-Lemma ht_asgn_derived: forall (X : nat) (a : AExp) (A : EBExp),
+Lemma ht_asgn_derived: forall (X : L) (a : AExp L) (A : EBExp L V),
     X ∉ aloc_vars a ∪ bloc_vars A ->
-    ht_ded A (Asgn X a) (EAnd A (EAEq (EVar X) a)).
+    ht_ded (ht A (Asgn X a) (EAnd A (EAEq (EVar X) a))).
 Proof.
     intros * HX.
     eapply ht_cons with (B' :=  (EAnd A (EAEq (EVar X) a)));
@@ -455,84 +477,90 @@ Qed.
 Section sec_Hoare_logic_example.
 
 Context
-  (n s i : nat)
+  (n s i : L)
   (Hns : n <> s)
   (Hsi : s <> i)
   (Hin : i <> n)
   .
 
-Definition w : Cmd := 
+Definition w : Cmd L := 
     While (ALe (Var i) (Var n))
       (Seq
       (Asgn s (Plus (Var s) (Var i)))
       (Asgn i (Plus (Var i) (AVal 1)))).
 
-Definition p : Cmd :=
+Definition p : Cmd L :=
   Seq (Seq
   (Asgn s (AVal 0))
   (Asgn i (AVal 0)))
   w.
 
-Definition pre : BExp := ALe (AVal 0) (Var n).
-Definition post : BExp :=
+Definition pre : BExp L := ALe (AVal 0) (Var n).
+Definition post : BExp L :=
     AEq (Mul (AVal 2) (Var s)) (Mul (Var n) (Plus (Var n) (AVal 1))).
 
-Lemma step_1 : ht_ded
+Lemma step_1 : ht_ded (ht
     pre
     (Asgn s (AVal 0))
-    (EAnd pre (EAEq (Var s) (AVal 0))).
+    (EAnd pre (EAEq (Var s) (AVal 0)))
+    ).
 Proof. by apply ht_asgn_derived; set_solver. Qed.
 
-Lemma step_2 : ht_ded
+Lemma step_2 : ht_ded (ht
     (EAnd pre (EAEq (Var s) (AVal 0)))
     (Asgn i (AVal 0))
-    (EAnd (EAnd pre (EAEq (Var s) (AVal 0))) (EAEq (Var i) (AVal 0))).
+    (EAnd (EAnd pre (EAEq (Var s) (AVal 0))) (EAEq (Var i) (AVal 0)))
+    ).
 Proof. by apply ht_asgn_derived; set_solver. Qed.
 
-Lemma step_12 : ht_ded
+Lemma step_12 : ht_ded (ht
     pre
     (Seq (Asgn s (AVal 0)) (Asgn i (AVal 0)))
-    (EAnd (EAnd pre (EAEq (Var s) (AVal 0))) (EAEq (Var i) (AVal 0))).
+    (EAnd (EAnd pre (EAEq (Var s) (AVal 0))) (EAEq (Var i) (AVal 0)))
+    ).
 Proof.
     eapply ht_seq; [apply step_1 | apply step_2].
 Qed.
 
-Definition invariant : BExp := And
+Definition invariant : BExp L := And
     (AEq (Mul (AVal 2) (Var s)) (Mul (Var i) (Minus (Var i) (AVal 1))))
     (ALe (Var i) (Plus (Var n) (AVal 1))).
 
-Lemma loop_inv_1 : ht_ded
+Lemma loop_inv_1 : ht_ded (ht
     (bsubst invariant subst0 (mk_subst [(i, Plus (Var i) (AVal 1))]))
     (Asgn i (Plus (Var i) (AVal 1)))
-    invariant.
+    invariant
+    ).
 Proof. by apply ht_asgn. Qed.
 
-Lemma loop_inv_2 : ht_ded
+Lemma loop_inv_2 : ht_ded (ht
     (bsubst
       (bsubst invariant subst0 (mk_subst [(i, Plus (Var i) (AVal 1))]))
       subst0 (mk_subst [(s, Plus (Var s) (Var i))]))
     (Asgn s (Plus (Var s) (Var i)))
-    (bsubst invariant subst0 (mk_subst [(i, Plus (Var i) (AVal 1))])).
+    (bsubst invariant subst0 (mk_subst [(i, Plus (Var i) (AVal 1))]))
+    ).
 Proof. by apply ht_asgn. Qed.
 
-Lemma loop_inv_12 : ht_ded
+Lemma loop_inv_12 : ht_ded (ht
     (bsubst
       (bsubst invariant subst0 (mk_subst [(i, Plus (Var i) (AVal 1))]))
       subst0 (mk_subst [(s, Plus (Var s) (Var i))]))
     (Seq
       (Asgn s (Plus (Var s) (Var i)))
       (Asgn i (Plus (Var i) (AVal 1))))
-    invariant.
+    invariant).
 Proof.
     eapply ht_seq; [apply loop_inv_2 | apply loop_inv_1].
 Qed.
 
-Lemma loop_inv : ht_ded
+Lemma loop_inv : ht_ded (ht
     (EAnd invariant (ALe (Var i) (Var n)))
     (Seq
       (Asgn s (Plus (Var s) (Var i)))
       (Asgn i (Plus (Var i) (AVal 1))))
-    invariant.
+    invariant
+    ).
 Proof.
     eapply ht_cons with (B' := invariant);
       [| apply loop_inv_12 | by intros sigma I; apply classical_satsi_impl].
@@ -547,10 +575,10 @@ Proof.
     by nia.
 Qed.
 
-Lemma p_while : ht_ded
+Lemma p_while : ht_ded (ht
     (EAnd (EAnd pre (EAEq (Var s) (AVal 0))) (EAEq (Var i) (AVal 0)))
     w
-    post.
+    post).
 Proof.
     eapply ht_cons; [| apply ht_while, loop_inv |];
       intros sigma I; apply classical_satsi_impl.
@@ -560,7 +588,7 @@ Proof.
       by nia.
 Qed.
 
-Lemma p_correct : ht_ded pre p post.
+Lemma p_correct : ht_ded (ht pre p post).
 Proof.
     by eapply ht_seq; [apply step_12 | apply p_while].
 Qed.
@@ -568,7 +596,7 @@ Qed.
 End sec_Hoare_logic_example.
 
 Lemma eaeval_subst_loc :
-  forall (sigma I : State) (e : EAExp) (x : nat) (a : AExp),
+  forall  (sigma : State L) (I : State V) (e : EAExp L V) (x : L) (a : AExp L),
   eaeval sigma I (asubst e subst0 (mk_subst [(x, a)]))
     =
   eaeval (State.update sigma x (denota a sigma)) I e.
@@ -585,7 +613,7 @@ Proof.
 Qed.
 
 Lemma satsi_subst_loc :
-  forall (sigma I : State) (e : EBExp) (x : nat) (a : AExp),
+  forall (sigma : State L) (I : State V) (e : EBExp L V) (x : L) (a : AExp L),
   satsi sigma I (bsubst e subst0 (mk_subst [(x, a)]))
     <->
   satsi (State.update sigma x (denota a sigma)) I e.
@@ -600,32 +628,33 @@ Proof.
   - cbn; rewrite !satsi_forall.
     apply forall_proper; intro z.
     rewrite <- IHe.
-    cut (fn_update subst0 n None = subst0); [by intros ->|].
+    cut (fn_update subst0 v None = subst0); [by intros ->|].
     extensionality y.
     by unfold fn_update; case_decide.
 Qed.
 
-Theorem ht_soundness : forall (A B : EBExp) (c : Cmd),
-    ht_ded A c B -> ht_sat (ht A c B).
+Theorem ht_soundness : forall (A B : EBExp L V) (c : Cmd L),
+    ht_ded (ht A c B) -> ht_sat (ht A c B).
 Proof.
     intros * Hht I. apply ht_sati_alt.
-    induction Hht; cbn in *; intros sigma sigma' Hdenot Hpre.
+    remember {| command := c|} as ht; revert A B c Heqht.
+    induction Hht; cbn in *; intros * ? sigma sigma' Hdenot Hpre; inversion Heqht; subst.
     - by inversion Hdenot; subst.
     - inversion Hdenot; subst.
       by apply satsi_subst_loc.
     - inversion Hdenot; subst.
-      eapply IHHht2; [done |]; cbn.
+      eapply IHHht2; [done.. |]; cbn.
       by eapply IHHht1.
     - inversion Hdenot; subst.
-      + eapply IHHht1; [done |].
+      + eapply IHHht1; [done.. |].
         apply satsi_and.
         split; [done |].
         by apply satsi_eval.
-      + eapply IHHht2; [done |].
+      + eapply IHHht2; [done.. |].
         rewrite satsi_and, satsi_not, satsi_eval.
         split; [done |].
         by rewrite H1.
-    - pose (W (ss' : State * State) := satsi ss'.1 I A -> satsi ss'.2 I (EAnd A (ENot b))).
+    - pose (W (ss' : State L * State L) := satsi ss'.1 I A0 -> satsi ss'.2 I (EAnd A0 (ENot b))).
       cut (lfp (while_step (denotb b) (denotc c)) ⊆ W);
         [by intros Hincl; apply Hincl in Hdenot; apply Hdenot |].
       apply knaster_tarski_least_pre_fixpoint.
@@ -634,13 +663,15 @@ Proof.
       unfold while_step.
       rewrite elem_of_relation_selector, elem_of_fwd_relation_composition.
       intros [(Hb & sigma'' & Hc & Hw)|[Hb Hdelta]] Hsigma.
-      + eapply Hw, IHHht; [done |].
+      + eapply Hw, IHHht; [done.. |].
         apply satsi_and; split; [done |].
         by apply satsi_eval.
       + inversion Hdelta; subst; cbn in *.
         rewrite satsi_and, satsi_not; split; [done |].
         by rewrite satsi_eval, Hb.
     - eapply classical_satsi_impl; [by apply H0 |].
-      eapply IHHht; [done |].
+      eapply IHHht; [done.. |].
       by eapply classical_satsi_impl; [apply H |].
 Qed.
+
+End sec_axiomatic.

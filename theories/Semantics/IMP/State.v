@@ -1,6 +1,6 @@
 From stdpp Require Import prelude.
 From sets Require Import Functions.
 
-Definition State : Type := nat -> Z.
+Definition State (L : Type) : Type := L -> Z.
 
-Definition update: State -> nat -> Z -> State := fn_update.
+Definition update `{EqDecision L} : State L -> L -> Z -> State L := fn_update.

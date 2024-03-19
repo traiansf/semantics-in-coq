@@ -130,12 +130,14 @@ End sec_sigma_algebra.
 
 Section sec_IMP_algebra.
 
+Context `{EqDecision L}.
+
 Inductive imp_sort : Type := is_A | is_B | is_C.
 
 Inductive imp_symbols : Type :=
 (* arithmetic exps *)
 | is_int : Z -> imp_symbols
-| is_var : nat -> imp_symbols
+| is_var : L -> imp_symbols
 | is_plus
 | is_minus
 | is_mul
@@ -150,7 +152,7 @@ Inductive imp_symbols : Type :=
 | is_or
 (* commands *)
 | is_skip
-| is_asgn : nat -> imp_symbols
+| is_asgn : L -> imp_symbols
 | is_seq
 | is_if
 | is_while
@@ -228,9 +230,9 @@ Definition IMP_sign : signature :=
 
 Definition IMP_term_support (s : sort IMP_sign) : Type :=
 match s with
-| is_A => AExp
-| is_B => BExp
-| is_C => Cmd
+| is_A => AExp L
+| is_B => BExp L
+| is_C => Cmd L
 end.
 
 Definition IMP_term_op_interp (sigma : symbols IMP_sign)
@@ -272,7 +274,7 @@ Section sec_term_interp.
 Context
     (A : algebra IMP_sign).
 
-Fixpoint IMP_term_interp_a (a : AExp) : support A is_A :=
+Fixpoint IMP_term_interp_a (a : AExp L) : support A is_A :=
 match a with
 | AVal n => op_interp A (is_int n) (fin_0_inv _)
 | Var x => op_interp A (is_var x) (fin_0_inv _)
@@ -299,7 +301,7 @@ match a with
             end)
 end.
 
-Fixpoint IMP_term_interp_b (b : BExp) : support A is_B :=
+Fixpoint IMP_term_interp_b (b : BExp L) : support A is_B :=
 match b with
 | BVal true => op_interp A is_true (fin_0_inv _)
 | BVal false => op_interp A is_false (fin_0_inv _)
@@ -352,7 +354,7 @@ Proof.
   intro i; inv_fin i.
 Defined.
 
-Fixpoint IMP_term_interp_c (c : Cmd) : support A is_C :=
+Fixpoint IMP_term_interp_c (c : Cmd L) : support A is_C :=
 match c with
 | Skip => op_interp A is_skip (fin_0_inv _)
 | Asgn x a => op_interp A (is_asgn x) (const (IMP_term_interp_a a))
@@ -424,40 +426,40 @@ Qed.
 
 End sec_term_interp.
 
-Definition a_1 (a1 : AExp) : forall i : fin 1, support IMP_term_algebra (const is_A i).
+Definition a_1 (a1 : AExp L) : forall i : fin 1, support IMP_term_algebra (const is_A i).
 Proof.
   intro i; inv_fin i; [exact a1 |].
   intro i; inv_fin i.
 Defined.
 
-Definition a_2 (a1 a2 : AExp) : forall i : fin 2, support IMP_term_algebra (const is_A i).
+Definition a_2 (a1 a2 : AExp L) : forall i : fin 2, support IMP_term_algebra (const is_A i).
 Proof.
   intro i; inv_fin i; [exact a1 |].
   intro i; inv_fin i; [exact a2 |].
   intro i; inv_fin i.
 Defined.
 
-Definition b_1 (b : BExp) : forall i : fin 1, support IMP_term_algebra (const is_B i).
+Definition b_1 (b : BExp L) : forall i : fin 1, support IMP_term_algebra (const is_B i).
 Proof.
   intro i; inv_fin i; [exact b |].
   intro i; inv_fin i.
 Defined.
 
-Definition b_2 (b1 b2 : BExp) : forall i : fin 2, support IMP_term_algebra (const is_B i).
+Definition b_2 (b1 b2 : BExp L) : forall i : fin 2, support IMP_term_algebra (const is_B i).
 Proof.
   intro i; inv_fin i; [exact b1 |].
   intro i; inv_fin i; [exact b2 |].
   intro i; inv_fin i.
 Defined.
 
-Definition c_2 (c1 c2 : Cmd) : forall i : fin 2, support IMP_term_algebra (const is_C i).
+Definition c_2 (c1 c2 : Cmd L) : forall i : fin 2, support IMP_term_algebra (const is_C i).
 Proof.
   intro i; inv_fin i; [exact c1 |].
   intro i; inv_fin i; [exact c2 |].
   intro i; inv_fin i.
 Defined.
 
-Definition term_support_star_if (b : BExp) (c1 c2 : Cmd) :
+Definition term_support_star_if (b : BExp L) (c1 c2 : Cmd L) :
     support_star IMP_term_algebra (projT2 (@arity IMP_sign is_if)).
 Proof.
   intro i; inv_fin i; [exact b |].
@@ -466,7 +468,7 @@ Proof.
   intro i; inv_fin i.
 Defined.
 
-Definition term_support_star_while (b : BExp) (c : Cmd) :
+Definition term_support_star_while (b : BExp L) (c : Cmd L) :
     support_star IMP_term_algebra (projT2 (@arity IMP_sign is_while)).
 Proof.
   intro i; inv_fin i; [exact b |].
@@ -484,7 +486,7 @@ Proof.
   induction a; cbn.
   - specialize (Hh (is_int z) zero_dep_fn); cbn in Hh; rewrite Hh.
     by f_equal; extensionality i; inv_fin i.
-  - specialize (Hh (is_var n) zero_dep_fn); cbn in Hh; rewrite Hh.
+  - specialize (Hh (is_var l) zero_dep_fn); cbn in Hh; rewrite Hh.
     by f_equal; extensionality i; inv_fin i.
   - specialize (Hh is_plus (a_2 a1 a2)); cbn in Hh; rewrite Hh.
     f_equal; extensionality i; inv_fin i; [done |].
@@ -546,7 +548,7 @@ Proof.
   induction c; cbn.
   - specialize (Hh is_skip zero_dep_fn); cbn in Hh; rewrite Hh.
     by f_equal; extensionality i; inv_fin i.
-  - pose (Hrew := Hh (is_asgn n) (a_1 a)); cbn in Hrew; rewrite Hrew.
+  - pose (Hrew := Hh (is_asgn l) (a_1 a)); cbn in Hrew; rewrite Hrew.
     f_equal; extensionality i;
       inv_fin i; [by erewrite IMP_term_interp_a_unique |].
     by intro i; inv_fin i.
@@ -580,9 +582,9 @@ Qed.
 
 Definition IMP_denot_support (s : sort IMP_sign) : Type :=
 match s with
-| is_A => State -> Z
-| is_B => State -> bool
-| is_C => Ensemble (State * State)
+| is_A => State L -> Z
+| is_B => State L -> bool
+| is_C => Ensemble (State L * State L)
 end.
 
 Definition IMP_denot_op_interp (sigma : symbols IMP_sign)

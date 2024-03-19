@@ -4,50 +4,54 @@ From sets Require Import Ensemble.
 
 From Semantics Require Import Syntax State Eval BigStep.
 
-Definition denota (a : AExp) : State -> Z :=
+Section sec_denotational.
+
+Context `{EqDecision L}.
+
+Definition denota (a : AExp L) : State L -> Z :=
     fun sigma => aeval sigma a.
 
-Definition denotb (b : BExp) : State -> bool :=
+Definition denotb (b : BExp L) : State L -> bool :=
     fun sigma => beval sigma b.
 
-Inductive delta : Ensemble (State * State) :=
-| delta_intro : forall (sigma : State), delta (sigma, sigma).
+Inductive delta : Ensemble (State L * State L) :=
+| delta_intro : forall (sigma : State L), delta (sigma, sigma).
 
-Lemma elem_of_delta: forall (sigma sigma' : State),
+Lemma elem_of_delta: forall (sigma sigma' : State L),
     (sigma, sigma') ∈ delta <-> sigma = sigma'.
 Proof. by split; [inversion 1 | intros ->; constructor]. Qed.
 
-Inductive denot_asgn (x : nat) (Ra : State -> Z) : Ensemble (State * State) :=
-| dasgn_intro : forall sigma : State,
+Inductive denot_asgn (x : L) (Ra : State L -> Z) : Ensemble (State L * State L) :=
+| dasgn_intro : forall sigma : State L,
     denot_asgn x Ra (sigma, update sigma x (Ra sigma)).
 
 Inductive fwd_relation_composition
-    (R Q : Ensemble (State * State)) : Ensemble (State * State) :=
-| relation_composition_intro : forall a b c : State,
+    (R Q : Ensemble (State L * State L)) : Ensemble (State L * State L) :=
+| relation_composition_intro : forall a b c : State L,
     (a, b) ∈ R -> (b, c) ∈ Q -> fwd_relation_composition R Q (a, c).
 
 Lemma elem_of_fwd_relation_composition:
-    forall (R Q : Ensemble (State * State)) (sigma sigma' : State),
+    forall (R Q : Ensemble (State L * State L)) (sigma sigma' : State L),
     (sigma, sigma') ∈ fwd_relation_composition R Q
       <->
-    exists (sigma'' : State), (sigma, sigma'') ∈ R /\ (sigma'', sigma') ∈ Q.
+    exists (sigma'' : State L), (sigma, sigma'') ∈ R /\ (sigma'', sigma') ∈ Q.
 Proof.
     intros; split.
     - by inversion 1; subst; eexists; split.
     - by intros (? & ? & ?); econstructor.
 Qed.
 
-Inductive relation_selector (cond : State -> bool)
-    (Then Else : Ensemble (State * State)) : Ensemble (State * State) :=
-| relation_selector_then : forall (sigma sigma' : State), cond sigma = true ->
+Inductive relation_selector (cond : State L -> bool)
+    (Then Else : Ensemble (State L * State L)) : Ensemble (State L * State L) :=
+| relation_selector_then : forall (sigma sigma' : State L), cond sigma = true ->
     (sigma, sigma') ∈ Then -> relation_selector cond Then Else (sigma, sigma')
-| relation_selector_else : forall (sigma sigma' : State), cond sigma = false ->
+| relation_selector_else : forall (sigma sigma' : State L), cond sigma = false ->
     (sigma, sigma') ∈ Else -> relation_selector cond Then Else (sigma, sigma')
 .
 
 Lemma elem_of_relation_selector:
-    forall (cond : State -> bool) (Then Else : Ensemble (State * State))
-        (sigma sigma' : State),
+    forall (cond : State L -> bool) (Then Else : Ensemble (State L * State L))
+        (sigma sigma' : State L),
     (sigma, sigma') ∈ relation_selector cond Then Else
       <->
     (cond sigma = true /\ (sigma, sigma') ∈ Then)
@@ -61,18 +65,18 @@ Proof.
       + by apply relation_selector_else.
 Qed.
 
-Definition while_step (cond : State -> bool)
-    (body while: Ensemble (State * State)) : Ensemble (State * State) :=
+Definition while_step (cond : State L -> bool)
+    (body while: Ensemble (State L * State L)) : Ensemble (State L * State L) :=
     relation_selector cond (fwd_relation_composition body while) delta.
 
-Lemma elem_of_while_step (cond : State -> bool)
-    (body while: Ensemble (State * State)):
-    forall (sigma sigma' : State),
+Lemma elem_of_while_step (cond : State L -> bool)
+    (body while: Ensemble (State L * State L)):
+    forall (sigma sigma' : State L),
     (sigma, sigma') ∈ while_step cond body while
       <->
     (cond sigma = false /\ sigma = sigma')
       \/
-    (cond sigma = true /\ exists (sigma'' : State), (sigma, sigma'') ∈ body /\ (sigma'', sigma') ∈ while).
+    (cond sigma = true /\ exists (sigma'' : State L), (sigma, sigma'') ∈ body /\ (sigma'', sigma') ∈ while).
 Proof.
     intros; unfold while_step.
     rewrite elem_of_relation_selector, elem_of_delta, elem_of_fwd_relation_composition.
@@ -80,8 +84,8 @@ Proof.
 Qed.
 
 
-#[export] Instance while_step_proper (cond : State -> bool)
-    (body : Ensemble (State * State)) : Proper ((⊆) ==> (⊆)) (while_step cond body).
+#[export] Instance while_step_proper (cond : State L -> bool)
+    (body : Ensemble (State L * State L)) : Proper ((⊆) ==> (⊆)) (while_step cond body).
 Proof.
     intros  W1 W2 Hsub (sigma, sigma') Hin.
     destruct (cond sigma) eqn:Hcond.
@@ -94,7 +98,7 @@ Proof.
       by apply relation_selector_else.
 Qed.
 
-Fixpoint denotc (c : Cmd) : Ensemble (State * State) :=
+Fixpoint denotc (c : Cmd L) : Ensemble (State L * State L) :=
 match c with
 | Skip => delta
 | Asgn x a => denot_asgn x (denota a)
@@ -105,7 +109,7 @@ end.
 
 (* For a proof of Knaster-Tarski's theorem, see https://github.com/traiansf/sets-in-coq/blob/main/theories/sets/Ensemble.v#L413 *)
 
-Lemma denot_equiv_big_step : forall (c : Cmd) (sigma sigma' : State),
+Lemma denot_equiv_big_step : forall (c : Cmd L) (sigma sigma' : State L),
     big_step c sigma sigma' <-> (sigma, sigma') ∈ denotc c.
 Proof.
     split.
@@ -131,7 +135,7 @@ Proof.
           by constructor; eapply bs_if_true.
         * apply IHc2 in H2 as [Hc2].
           by constructor; eapply bs_if_false.
-      + pose (W (sp : State * State) := big_step (While b c) sp.1 sp.2).
+      + pose (W (sp : State L * State L) := big_step (While b c) sp.1 sp.2).
         cut (denotc (While b c) ⊆ W); [by intro Hincl; apply Hincl in Hdenot |].
         clear sigma sigma' Hdenot.
         apply knaster_tarski_least_pre_fixpoint.
@@ -162,14 +166,14 @@ Proof.
     by inversion H'; inversion H''; subst.
 Qed.
 
-Lemma pf_denot_asgn : forall (x : nat) (Ra : State -> Z),
+Lemma pf_denot_asgn : forall (x : L) (Ra : State L -> Z),
     partial_function (denot_asgn x Ra).
 Proof.
     intros x a sigma sigma' sigma'' H' H''.
     by inversion H'; inversion H''; subst.
 Qed.
 
-Lemma pf_fwd_relation_composition: forall (R Q : Ensemble (State * State)),
+Lemma pf_fwd_relation_composition: forall (R Q : Ensemble (State L * State L)),
     partial_function R -> partial_function Q ->
     partial_function (fwd_relation_composition R Q).
 Proof.
@@ -179,7 +183,7 @@ Proof.
     by rewrite (HQ b0 sigma' sigma'' H2 H6).
 Qed.
 
-Lemma pf_relation_selector: forall (cond : State -> bool) (Then Else : Ensemble (State * State)),
+Lemma pf_relation_selector: forall (cond : State L -> bool) (Then Else : Ensemble (State L * State L)),
     partial_function Then -> partial_function Else ->
     partial_function (relation_selector cond Then Else).
 Proof.
@@ -191,7 +195,7 @@ Proof.
       by rewrite (HElse sigma sigma' sigma'' H2 H4).
 Qed.
 
-Lemma pf_while_step: forall (cond : State -> bool) (body while : Ensemble (State * State)),
+Lemma pf_while_step: forall (cond : State L -> bool) (body while : Ensemble (State L * State L)),
     partial_function body -> partial_function while ->
     partial_function (while_step cond body while).
 Proof.
@@ -200,7 +204,7 @@ Proof.
 Qed.
 
 #[export] Instance while_step_continuous:
-    forall (cond : State -> bool) (body : Ensemble (State * State)),
+    forall (cond : State L -> bool) (body : Ensemble (State L * State L)),
     Continuous (while_step cond body).
 Proof.
     intros *; constructor; intros C (sigma, sigma').
@@ -215,7 +219,7 @@ Proof.
 Qed.
 
 Lemma pf_ascending_chain:
-    forall (C : nat -> Ensemble (State * State)),
+    forall (C : nat -> Ensemble (State L * State L)),
         (forall (n : nat), partial_function (C n)) ->
         ascending_chain C ->
         partial_function (indexed_union C).
@@ -230,7 +234,7 @@ Proof.
       by lia.
 Qed.
 
-Lemma pf_denot_while : forall (cond : State -> bool) (body : Ensemble (State * State)),
+Lemma pf_denot_while : forall (cond : State L -> bool) (body : Ensemble (State L * State L)),
     partial_function body ->
     partial_function (lfp (while_step cond body)).
 Proof.
@@ -242,7 +246,7 @@ Proof.
     by apply pf_while_step.
 Qed.
 
-Lemma pf_denotc: forall (c : Cmd), partial_function (denotc c).
+Lemma pf_denotc: forall (c : Cmd L), partial_function (denotc c).
 Proof.
     induction c.
     - by apply pf_delta.
@@ -251,3 +255,5 @@ Proof.
     - by apply pf_relation_selector.
     - by apply pf_denot_while.
 Qed.
+
+End sec_denotational.
