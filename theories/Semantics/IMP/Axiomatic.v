@@ -674,4 +674,124 @@ Proof.
       by eapply classical_satsi_impl; [apply H |].
 Qed.
 
+Section sec_weakest_precondition.
+
+Definition ws (c : Cmd L) (B : EBExp L V) (I : State V) : Ensemble (State L) :=
+    fun (sigma : State L) =>
+    forall (sigma' : State L), (sigma, sigma') ∈ denotc c -> satsi sigma' I B.
+
+Lemma ws_weakest :
+  forall (A B : EBExp L V) (c : Cmd L) (I : State V),
+  ht_sati I (ht A c B)
+    <->
+  sem I A ⊆ ws c B I.
+Proof. done. Qed.
+
+Section sec_wp_while.
+
+Context
+    (b : BExp L) (c : Cmd L) (w := While b c)
+    (B : EBExp L V).
+
+Inductive WhileOpenSequence : State L -> list (State L) -> State L -> Prop :=
+| ws_zero : forall (sigma : State L),
+    WhileOpenSequence sigma [sigma] sigma
+| ws_more : forall (sigma sigma' sigmaf : State L) (trace : list (State L)),
+    denotb b sigma = true ->
+    (sigma, sigma') ∈ denotc c ->
+    WhileOpenSequence sigma' trace sigmaf ->
+    WhileOpenSequence sigma (sigma :: trace) sigmaf
+.
+
+Lemma wos_first : forall (sigma sigma' : State L) (trace : list (State L)),
+    WhileOpenSequence sigma trace sigma' -> head trace = Some sigma.
+Proof. by intros *; inversion 1; subst. Qed.
+
+Lemma wos_last : forall (sigma sigma' : State L) (trace : list (State L)),
+    WhileOpenSequence sigma trace sigma' -> last trace = Some sigma'.
+Proof.
+    intros *; induction 1; [done |].
+    by rewrite last_cons, IHWhileOpenSequence.
+Qed.
+
+Record WhileSequence (sigma : State L) (trace : list (State L)) (sigma' : State L) : Prop :=
+{
+  ws_open : WhileOpenSequence sigma trace sigma';
+  ws_done : denotb b sigma' = false;
+}.
+
+Lemma ws_first : forall (sigma sigma' : State L) (trace : list (State L)),
+    WhileSequence sigma trace sigma' -> head trace = Some sigma.
+Proof. by intros * []; eapply wos_first. Qed.
+
+Lemma ws_last : forall (sigma sigma' : State L) (trace : list (State L)),
+    WhileSequence sigma trace sigma' -> last trace = Some sigma'.
+Proof. by intros * []; eapply wos_last. Qed.
+
+Lemma wp_claim1 :
+    forall  (sigma sigma' : State L),
+    (sigma, sigma') ∈ denotc w 
+      <->
+    exists (trace : list (State L)),
+    WhileSequence sigma trace sigma'.
+Proof.
+    intros; split.
+    - intro Hw.
+      pose (W (ss' : State L * State L) :=
+        exists (trace : list (State L)), WhileSequence ss'.1 trace ss'.2).
+      cut (denotc w ⊆ W);
+        [by intro Hincl; apply Hincl in Hw; apply Hw |].
+      apply knaster_tarski_least_pre_fixpoint.
+      clear.
+      intros (sigma, sigma').
+      unfold while_step; rewrite elem_of_relation_selector, elem_of_fwd_relation_composition.
+      intros [(Hb & sigma'' & Hc & trace & ? & ?) | [Hb Hdelta]].
+      + by exists (sigma :: trace); constructor; [econstructor |].
+      + inversion Hdelta; subst.
+        by exists [sigma']; constructor; [constructor |].
+    - intros [trace [Hw Hlst]].
+      induction Hw; (apply knaster_tarski_lfp_fix; [by typeclasses eauto |]).
+      + apply elem_of_relation_selector; right.
+        by split; [| constructor].
+      + apply elem_of_relation_selector; left.
+        split; [done |].
+        apply elem_of_fwd_relation_composition.
+        specialize (IHHw Hlst).
+        by eexists.
+Qed.
+
+Lemma wp_claim2 : forall (sigma : State L) (I : State V),
+    sigma ∈ ws w B I
+      <->
+    forall (sigma' : State L) (trace : list (State L)),
+        WhileOpenSequence sigma trace sigma' ->
+        satsi sigma' I (EOr b B).
+Proof.
+    intros. apply forall_proper; intros sigma'.
+    rewrite wp_claim1.
+    split; cycle 1.
+    - intros Hall (trace & Hw & Hlst).
+      specialize (Hall _ Hw).
+      apply satsi_or in Hall as [Hb |]; [| done].
+      by apply satsi_eval in Hb; rewrite Hb in Hlst.
+    - intros Hex trace Htrace.
+      rewrite satsi_or, satsi_eval.
+      destruct (denotb b sigma') eqn:Hb; [by left |].
+      right; apply Hex.
+      by exists trace; split.
+Qed.
+
+End sec_wp_while.
+
+Fixpoint wp (c : Cmd L) (B : EBExp L V) :=
+match c with
+| Skip => B
+| Asgn X a => bsubst B subst0 (mk_subst [(X, a)])
+| Seq c0 c1 => wp c0 (wp c1 B)
+| If b c0 c1 => EOr (EAnd b (wp c0 B)) (EAnd (ENot b) (wp c1 B))
+| _ => B
+end.
+
+End sec_weakest_precondition.
+
 End sec_axiomatic.
