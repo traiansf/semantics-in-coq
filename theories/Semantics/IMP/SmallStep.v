@@ -74,7 +74,6 @@ Proof.
     by exists sigma''; split; apply rtc_nsteps; eexists.
 Qed.
 
-
 Lemma small_step_equiv_big_step : forall (c : Cmd L) (sigma sigma' : State L),
     big_step c sigma sigma' <-> small_step (c, sigma) (Skip, sigma').
 Proof.
