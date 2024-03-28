@@ -75,6 +75,9 @@ Global Coercion aexp_to_eaexp : AExp >-> EAExp.
 Definition eb_impl (b1 b2: EBExp L V) : EBExp L V :=
   EOr (ENot b1) b2.
 
+Definition eb_iff  (b1 b2: EBExp L V) : EBExp L V :=
+  EAnd (eb_impl b1 b2) (eb_impl b2 b1).
+
 Definition eb_exists (x : V) (b : EBExp L V) : EBExp L V :=
     ENot (Forall x (ENot b)).
 
@@ -409,6 +412,22 @@ Proof.
     - by left.
 Qed.
 
+Lemma satsi_iff : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
+    satsi sigma I (eb_iff b1 b2) <-> (satsi sigma I b1 <-> satsi sigma I b2).
+Proof.
+    intros; unfold eb_iff.
+    rewrite satsi_and, !classical_satsi_impl.
+    by tauto.
+Qed.
+
+Lemma satsi_iff_lr : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
+    satsi sigma I (eb_iff b1 b2) -> (satsi sigma I (eb_impl b1 b2)).
+Proof. by intros *; rewrite satsi_iff, classical_satsi_impl; tauto. Qed.
+
+Lemma satsi_iff_rl : forall (sigma : State L) (I : State V) (b1 b2 : EBExp L V),
+    satsi sigma I (eb_iff b1 b2) -> (satsi sigma I (eb_impl b2 b1)).
+Proof. by intros *; rewrite satsi_iff, classical_satsi_impl; tauto. Qed.
+
 Lemma satsi_eval : forall (sigma : State L) (I : State V) (b : BExp L),
     satsi sigma I b <-> denotb b sigma = true.
 Proof.
@@ -439,6 +458,70 @@ Definition sati (b : EBExp L V) : Prop :=
 
 Definition sat (b : EBExp L V) : Prop :=
     forall (sigma : State L) (I : State V), satsi sigma I b.
+
+
+Lemma sat_true : sat (BVal true).
+Proof. done. Qed.
+
+Lemma sat_and_intro : forall (b1 b2 : EBExp L V),
+     sat b1 -> sat b2 -> sat (EAnd b1 b2).
+Proof.
+    by intros * Hb1 Hb2 sigma I; apply satsi_and_intro; [apply Hb1 | apply Hb2].
+Qed.
+
+Lemma sat_and_elim_l : forall (b1 b2 : EBExp L V),
+    sat (EAnd b1 b2) -> sat b1.
+Proof. by intros * Hand sigma I; eapply satsi_and_elim_l, Hand. Qed.
+
+Lemma sat_and_elim_r : forall (b1 b2 : EBExp L V),
+    sat (EAnd b1 b2) -> sat b2.
+Proof. by intros * Hand sigma I; eapply satsi_and_elim_r, Hand. Qed.
+
+Lemma sat_and : forall (b1 b2 : EBExp L V),
+    sat (EAnd b1 b2) <-> sat b1 /\ sat b2.
+Proof.
+    split.
+    - by split; [eapply sat_and_elim_l | eapply sat_and_elim_r].
+    - by intros []; apply sat_and_intro.
+Qed.
+
+Lemma sat_or_intro_l : forall (b1 b2 : EBExp L V),
+    sat b1 -> sat (EOr b1 b2).
+Proof. by intros * Hb1 sigma I; apply satsi_or; left; apply Hb1. Qed.
+
+Lemma sat_or_intro_r : forall (b1 b2 : EBExp L V),
+    sat b2 -> sat (EOr b1 b2).
+Proof. by intros * Hb2 sigma I; apply satsi_or; right; apply Hb2. Qed.
+
+Lemma sat_mp :  forall (b1 b2 : EBExp L V),
+    sat (eb_impl b1 b2) -> sat b1 -> sat b2.
+Proof.
+    by intros * Hb12 Hb1 sigma I; eapply satsi_mp; [apply Hb12 | apply Hb1].
+Qed.
+
+Lemma sat_iff : forall (b1 b2 : EBExp L V),
+    sat (eb_iff b1 b2) -> (sat b1 <-> sat b2).
+Proof.
+    intros * Hiff; split.
+    - intros Hb1 sigma I.
+      by specialize (Hiff sigma I); rewrite satsi_iff in Hiff; apply Hiff, Hb1.
+    - intros Hb2 sigma I.
+      by specialize (Hiff sigma I); rewrite satsi_iff in Hiff; apply Hiff, Hb2.
+Qed.
+
+Lemma sat_iff_lr : forall (b1 b2 : EBExp L V),
+    sat (eb_iff b1 b2) -> sat (eb_impl b1 b2).
+Proof.
+    intros * Hiff sigma I.
+    by specialize (Hiff sigma I); apply satsi_iff_lr in Hiff; apply Hiff.
+Qed.
+
+Lemma sat_iff_rl : forall (b1 b2 : EBExp L V),
+    sat (eb_iff b1 b2) -> sat (eb_impl b2 b1).
+Proof.
+    intros * Hiff sigma I.
+    by specialize (Hiff sigma I); apply satsi_iff_rl in Hiff; apply Hiff.
+Qed.
 
 Definition sem (I : State V) (A : EBExp L V) : Ensemble (State L) :=
     fun (sigma : State L) => satsi sigma I A.

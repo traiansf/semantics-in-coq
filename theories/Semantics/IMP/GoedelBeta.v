@@ -376,3 +376,29 @@ Proof.
     exists (beta_n a), (beta_m a).
     by apply beta_lemma_c.
 Qed.
+
+Definition beta_z_helper (x : nat) (y : Z) : Prop :=
+    exists (z : nat),
+      (x = 2 * z -> y = Z.of_nat z)
+        /\
+      (x = 2 * z + 1 -> y = (- Z.of_nat z)%Z).
+
+Definition beta_z (n m j : nat) (y : Z) : Prop :=
+    beta_z_helper (beta_fn n m j) y.
+
+Definition beta_naturalize `(a : fin k -> Z) (i : fin k) : nat :=
+    if decide (a i < 0)%Z then 2 * (Z.to_nat (- a i)) + 1 else 2 * Z.to_nat (a i).
+
+Lemma beta_z_lemma :
+    forall (k : nat) (a : fin k -> Z),
+    exists (n m : nat),
+        forall (j : fin k),
+        beta_z n m j (a j).
+Proof.
+    intros.
+    destruct (beta_lemma k (beta_naturalize a)) as (n & m & Hbeta).
+    exists n, m; intros.
+    exists (Z.to_nat (Z.abs (a j))).
+    rewrite Hbeta; unfold beta_naturalize.
+    by case_decide; lia.
+Qed.
