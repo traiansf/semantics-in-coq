@@ -1,7 +1,8 @@
 From stdpp Require Import prelude.
 From Coq Require Import FunctionalExtensionality.
 From sets Require Import Ensemble.
-From Semantics Require Import Syntax State Denotational.
+
+From Semantics.IMP Require Import Syntax State Denotational.
 
 Record signature : Type := {
 sort : Type;

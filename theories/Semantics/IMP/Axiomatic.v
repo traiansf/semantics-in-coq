@@ -2,7 +2,7 @@ From stdpp Require Import prelude.
 From Coq Require Import Classical FunctionalExtensionality.
 From sets Require Import Functions Ensemble.
 
-From Semantics Require Import Syntax State Denotational.
+From Semantics.IMP Require Import Syntax State Denotational.
 
 Inductive EAExp (L V : Type) : Type :=
     | LVar : V -> EAExp L V

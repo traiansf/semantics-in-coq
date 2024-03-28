@@ -2,7 +2,7 @@ From stdpp Require Import prelude.
 
 From sets Require Import Ensemble.
 
-From Semantics Require Import Syntax State Eval BigStep.
+From Semantics.IMP Require Import Syntax State Eval BigStep.
 
 Section sec_denotational.
 

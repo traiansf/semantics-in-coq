@@ -1,6 +1,6 @@
 From stdpp Require Import prelude.
 
-From Semantics Require Import Syntax State.
+From Semantics.IMP Require Import Syntax State.
 
 Section sec_eval.
 

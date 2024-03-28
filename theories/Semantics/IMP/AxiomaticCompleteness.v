@@ -2,7 +2,8 @@ From stdpp Require Import prelude finite.
 From Coq Require Import Classical FunctionalExtensionality.
 From sets Require Import Functions Ensemble.
 
-From Semantics Require Import Syntax State Denotational Axiomatic GoedelBeta.
+From Semantics.Utils Require Import GoedelBeta.
+From Semantics.IMP Require Import Syntax State Denotational Axiomatic.
 
 
 Section sec_axiomatic_completeness.

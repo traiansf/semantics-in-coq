@@ -1,7 +1,7 @@
 From stdpp Require Import prelude.
 From Coq Require Import Classical ClassicalFacts.
 
-From Semantics Require Import Syntax State Eval.
+From Semantics.IMP Require Import Syntax State Eval.
 
 Section sec_big_step.
 

@@ -2,7 +2,8 @@
 
 -arg -w -arg -future-coercion-class-field
 
-theories/Semantics/IMP/GoedelBeta.v
+theories/Semantics/Utils/GoedelBeta.v
+
 theories/Semantics/IMP/Syntax.v
 theories/Semantics/IMP/State.v
 theories/Semantics/IMP/Eval.v
