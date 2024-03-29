@@ -2,6 +2,7 @@ From stdpp Require Import prelude.
 From Coq Require Import Classical FunctionalExtensionality.
 From sets Require Import Functions Ensemble.
 
+From Semantics.Utils Require Import SetsExtras.
 From Semantics.IMP Require Import Syntax State Denotational.
 
 Inductive EAExp (L V : Type) : Type :=
@@ -279,27 +280,6 @@ Proof.
     - by rewrite IHa1, IHa2 by set_solver.
     - by rewrite IHa1, IHa2 by set_solver.
     - by rewrite IHa1, IHa2 by set_solver.
-Qed.
-
-Lemma top_char X : X ≡ top True <-> I ∈ X.
-Proof.
-    rewrite elem_of_equiv_top.
-    split; [done |].
-    by intros HI [].
-Qed.
-
-Lemma bot_char (X : Ensemble True) : X ≡ ∅ <-> I ∉ X.
-Proof.
-    split; [by set_solver |].
-    intros HI.
-    apply equiv_empty.
-    by intros [] Hx.
-Qed.
-
-Lemma top_not_bottom : top True ≢ ∅.
-Proof.
-    rewrite bot_char.
-    by intro contra; apply contra.
 Qed.
 
 Fixpoint satsi_set (sigma : State L) (I : State V) (b : EBExp L V) : Ensemble True :=

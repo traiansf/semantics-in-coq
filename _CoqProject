@@ -3,6 +3,7 @@
 -arg -w -arg -future-coercion-class-field
 
 theories/Semantics/Utils/GoedelBeta.v
+theories/Semantics/Utils/SetsExtras.v
 
 theories/Semantics/IMP/Syntax.v
 theories/Semantics/IMP/State.v
@@ -13,3 +14,5 @@ theories/Semantics/IMP/Denotational.v
 theories/Semantics/IMP/Algebraic.v
 theories/Semantics/IMP/Axiomatic.v
 theories/Semantics/IMP/AxiomaticCompleteness.v
+
+theories/Semantics/FOL/Syntax.v
