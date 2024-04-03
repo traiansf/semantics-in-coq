@@ -21,6 +21,46 @@ Definition f_or {V A} (f g : Formula V A) := Impl (f_neg f) g.
 Definition f_iff {V A} (f g : Formula V A) := f_and (Impl f g) (Impl g f).
 Definition f_ex {V A} (x : V) (f : Formula V A) := f_neg (All x (f_neg f)).
 
+Record FiniteConjunction  (V : Type) (A : Type -> Type) := mk_finite_conjunction
+{
+get_finite_conjunction : list (Formula V A)
+}.
+
+Arguments get_finite_conjunction {V%type_scope A%function_scope} f : assert.
+Arguments mk_finite_conjunction {V%type_scope A%function_scope} get_finite_conjunction%list_scope : assert.
+
+Fixpoint f_list_and `(l : list (Formula V A)) : Formula V A :=
+match l with
+| [] => f_top
+| [h] => h
+| h :: t => f_and h (f_list_and t)
+end.
+
+Definition finite_conjunction_to_formula `(f : FiniteConjunction V A) : Formula V A :=
+    f_list_and (get_finite_conjunction f).
+
+Coercion finite_conjunction_to_formula : FiniteConjunction >-> Formula.
+
+Record FiniteDisjunction  (V : Type) (A : Type -> Type) := mk_finite_disjunction
+{
+get_finite_disjunction : list (Formula V A)
+}.
+
+Arguments get_finite_disjunction {V%type_scope A%function_scope} f : assert.
+Arguments mk_finite_disjunction {V%type_scope A%function_scope} get_finite_disjunction%list_scope : assert.
+
+Fixpoint f_list_or `(l : list (Formula V A)) : Formula V A :=
+match l with
+| [] => Bot
+| [h] => h
+| h :: t => f_or h (f_list_or t)
+end.
+
+Definition finite_disjunction_to_formula `(f : FiniteDisjunction V A) : Formula V A :=
+    f_list_or (get_finite_disjunction f).
+
+Coercion finite_disjunction_to_formula : FiniteDisjunction >-> Formula.
+
 Class FreeVars (A V : Type) :=
     free_vars : A -> listset V.
 #[global] Hint Mode FreeVars ! - : typeclass_instances.
@@ -123,16 +163,16 @@ Lemma vterm_fv_app {V} (s : symbol sigma) (ts : vec (VTerm V) (s_arity s)) :
     free_vars (App s ts) = ⋃ vmap free_vars  ts.
 Proof. done. Qed.
 
-Definition Term : Type := VTerm False.
+Definition GroundTerm : Type := VTerm False.
 
-Definition term_to_vterm (V : Type) : Term -> VTerm V :=
+Definition term_to_vterm (V : Type) : GroundTerm -> VTerm V :=
     vterm_rect False (fun _ => VTerm V) (fun n _ => vec (VTerm V) n)
       (fun x => match x with end)
       (fun sigma _ va => App sigma va)
       [#]
       (fun _ n v0 _ vl => v0 ::: vl).
 
-Lemma term_vars : forall (t : Term), free_vars t ≡ ∅.
+Lemma term_vars : forall (t : GroundTerm), free_vars t ≡ ∅.
 Proof.
     induction t using vterm_ind; cbn; [by inversion v |].
     apply empty_union_list, Forall_forall; intros.
@@ -147,7 +187,16 @@ Definition rel_atom_vars {V} (ra : RelAtom V) : listset V :=
     | RApp _ pi ts => ⋃ map free_vars (vec_to_list ts)
     end.
 
+Record RelAtomConjunction (V : Type) := mk_ra_conjunction
+{
+    get_ra_conjunction : list (RelAtom V)
+}.
+
 #[export] Instance rel_atom_free_vars V : FreeVars (RelAtom V) V := rel_atom_vars.
+
+Inductive RelLiteral (V : Type) :=
+| RLPos (a : RelAtom V)
+| RLNeg (a : RelAtom V).
 
 Inductive EqAtom (V : Type) :=
 | REq (l r : VTerm V).
@@ -190,6 +239,22 @@ end.
 
 Coercion formula_eq_to_rel : EqFormula >-> RelEqFormula.
 
+Definition rel_literal_to_formula `(rl : RelLiteral V) : RelFormula V :=
+match rl with
+| RLPos _ a => Atomic a
+| RLNeg _ a => f_neg (Atomic a)
+end.
+
+Coercion rel_literal_to_formula : RelLiteral >-> RelFormula.
+
+Definition ra_conjunction_to_finite `(rac : RelAtomConjunction V) : FiniteConjunction V RelAtom :=
+    mk_finite_conjunction (map Atomic (get_ra_conjunction _ rac)).
+
+Definition ra_conjunction_to_rel_formula {V} : RelAtomConjunction V -> RelFormula V :=
+    finite_conjunction_to_formula ∘ ra_conjunction_to_finite.
+
+Coercion ra_conjunction_to_rel_formula : RelAtomConjunction >-> RelFormula.
+
 End sec_terms.
 
 Arguments Var {sigma V%type_scope} v : assert.
@@ -200,3 +265,11 @@ Arguments REq {sigma V%type_scope} l r : assert.
 
 Arguments ARel {sigma V%type_scope} ar : assert.
 Arguments AEq {sigma V%type_scope} ae : assert.
+
+Arguments RLPos {sigma V%type_scope} a : assert.
+Arguments RLNeg {sigma V%type_scope} a : assert.
+
+Arguments mk_ra_conjunction {sigma V%type_scope} get_ra_conjunction%list_scope : assert.
+Arguments get_ra_conjunction {sigma V%type_scope} r : assert.
+
+Arguments ra_conjunction_to_rel_formula {sigma V%type_scope} _ : assert.

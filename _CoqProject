@@ -17,3 +17,6 @@ theories/Semantics/IMP/AxiomaticCompleteness.v
 
 theories/Semantics/FOL/Syntax.v
 theories/Semantics/FOL/Semantics.v
+
+theories/Semantics/PROLOG/Syntax.v
+theories/Semantics/PROLOG/Semantics.v
