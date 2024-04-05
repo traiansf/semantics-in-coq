@@ -1,5 +1,5 @@
 From stdpp Require Import prelude.
-From Coq Require Import Classical.
+From Coq Require Import Classical FunctionalExtensionality.
 
 From sets Require Import Ensemble Functions.
 
@@ -245,10 +245,14 @@ Qed.
 
 End sec_satisfaction_defs.
 
+Definition var_equivalent `{M : structure sigma}
+    `(vs : listset V) (v1 v2 : V -> support M) : Prop :=
+    forall (x : V), x ∈ vs -> v1 x = v2 x.
+
 Class FreeVarsSupportedSatisfaction (sigma : signature) (V F : Type) `{Satisfaction sigma V F} `{FreeVars F V} : Prop :=
     fv_supported_sat :
         forall (M : structure sigma) (f : F) (v1 v2 : V -> support M),
-        (forall (x : V), x ∈ free_vars f -> v1 x = v2 x) ->
+        var_equivalent (free_vars f) v1 v2 ->
         vsat M f v1 <-> vsat M f v2.
 
 Section sec_fv_supp_sat_props.
@@ -372,6 +376,61 @@ Proof.
       by eapply Hall.
 Qed.
 
+Lemma vsat_neg_ex_all : forall (x : V) (f : Formula V A) (v : V -> support M),
+    vsat M (f_neg (f_ex x f)) v <-> vsat M (All x (f_neg f)) v.
+Proof.
+    intros; rewrite vsat_all, vsat_neg, vsat_ex.
+    setoid_rewrite vsat_neg.
+    split.
+    - by apply not_ex_all_not.
+    - by apply all_not_not_ex.
+Qed.
+
+Lemma vsat_list_and : forall (fs : list (Formula V A)) (v : V -> support M),
+    vsat M (f_list_and fs) v <-> Forall (fun f => vsat M f v) fs.
+Proof.
+    intros; induction fs.
+    - split; [by constructor |].
+      by intros _; apply vsat_top.
+    - rewrite Forall_cons, <- IHfs.
+      destruct (decide (fs = [])).
+      + subst; cbn.
+        split; [| by intros []].
+        by split; [| apply vsat_top].
+      + by rewrite f_list_and_unfold, vsat_and.
+Qed.
+
+Lemma vsat_list_or : forall (fs : list (Formula V A)) (v : V -> support M),
+    vsat M (f_list_or fs) v <-> Exists (fun f => vsat M f v) fs.
+Proof.
+    intros; induction fs.
+    - cbn; split; [| by inversion 1].
+      by intro contra; contradict contra; apply vsat_bot.
+    - rewrite Exists_cons, <- IHfs.
+      destruct (decide (fs = [])).
+      + subst; cbn.
+        split; [by left |].
+        intros [| contra]; [done |].
+        by contradict contra; apply vsat_bot.
+      + by rewrite f_list_or_unfold, vsat_or.
+Qed.
+
+Lemma vsat_neg_list_and : forall (fs : list (Formula V A)) (v : V -> support M),
+    vsat M (f_neg (f_list_and fs)) v
+      <->
+    vsat M (f_list_or (map f_neg fs)) v.
+Proof.
+    intros; rewrite vsat_neg, vsat_list_and, vsat_list_or, <- Exists_Forall_neg by (intro; apply classic).
+    rewrite Exists_map, !Exists_exists.
+    by apply exist_proper; intro; rewrite vsat_neg.
+Qed.
+
+Lemma sat_neg_list_and : forall (fs : list (Formula V A)),
+    sat M (f_neg (f_list_and fs))
+      <->
+    sat M (f_list_or (map f_neg fs)).
+Proof. by intros; apply forall_proper, vsat_neg_list_and. Qed.
+
 End vsat_props.
 
 #[export] Instance formula_fv_supp_sat `{EqDecision V}
@@ -382,8 +441,8 @@ Proof.
       by apply fv_supported_sat.
     - done.
     - rewrite !vsat_impl, IHf1, IHf2; [done |..].
-      + by intros; apply Heqv, elem_of_union; right.
-      + by intros; apply Heqv, elem_of_union; left.
+      + by intros ? **; apply Heqv, elem_of_union; right.
+      + by intros ? **; apply Heqv, elem_of_union; left.
     - rewrite !vsat_all.
       apply forall_proper; intro a.
       apply IHf.
@@ -392,6 +451,138 @@ Proof.
       apply Heqv, elem_of_difference.
       split; [done |].
       by rewrite elem_of_singleton.
+Qed.
+
+Lemma vsat_ex_closure `{EqDecision V} `{FreeVarsSupportedSatisfaction sigma V (A V)} :
+    forall (M : structure sigma) (f : Formula V A) (v : V -> support M),
+    vsat M (f_ex_closure f) v <-> exists (v' : V -> support M), vsat M f v'.
+Proof.
+    intros; unfold f_ex_closure.
+    remember (elements (free_vars f)) as fv.
+    cut (vsat M (foldr f_ex f fv) v <->
+        ∃ v' : V → support M,
+            var_equivalent (free_vars f ∖ list_to_set fv) v v'
+              /\
+            vsat M f v').
+    {
+        intros ->.
+        apply exist_proper; intro v'; split; [by intros [] |].
+        intro; split; [| done].
+        by intros x Hx; subst; set_solver.
+    }
+    clear Heqfv; revert v; induction fv as [| x fv IHfv ]; cbn; intros.
+    - split; [by intro; exists v |].
+      intros (v' & Heqv & Hv').
+      erewrite fv_supported_sat; [done |].
+      by intros x Hx; apply Heqv; set_solver.
+    - rewrite vsat_ex; setoid_rewrite IHfv; split.
+      + intros (a & v' & Heqv & Hv'); exists v'; split; [| done].
+        intros y Hy.
+        rewrite <- Heqv by set_solver.
+        unfold fn_update; case_decide; [| done].
+        by subst; set_solver.
+      + intros (v' & Heqv & Hv').
+        exists (v' x), v'; split; [| done].
+        intros y Hy; unfold fn_update; case_decide; [by subst |].
+        by apply Heqv; set_solver.
+Qed.
+
+Lemma sat_ex_closure `{EqDecision V} `{FreeVarsSupportedSatisfaction sigma V (A V)} :
+    forall (M : structure sigma) `{Inhabited (support M)} (f : Formula V A),
+    sat M (f_ex_closure f) <-> exists (v' : V -> support M), vsat M f v'.
+Proof.
+    intros.
+    rewrite fv_supported_sat_statement_exists;
+      [| done | by apply ex_closure_statement].
+    rewrite <- (vsat_ex_closure M f (const inhabitant)).
+    split; [| by intro; eexists].
+    intros [v Hsat]; eapply fv_supported_sat_statement_all; [| done].
+    by apply ex_closure_statement.
+Qed.
+
+Lemma sat_all `{EqDecision V} `{Satisfaction sigma V (A V)} :
+    forall (M : structure sigma) (x : V) (f : Formula V A),
+    sat M (All x f) <-> sat M f.
+Proof.
+    intros; split; intros Hsat v.
+    - specialize (Hsat v); rewrite vsat_all in Hsat.
+      specialize (Hsat (v x)).
+      replace (fn_update v x (v x)) with v in Hsat; [done |].
+      by extensionality y; unfold fn_update; case_decide; [subst |].
+    - by rewrite vsat_all; intro; apply Hsat.
+Qed.
+
+Lemma sat_all_closure `{EqDecision V} `{FreeVarsSupportedSatisfaction sigma V (A V)} :
+    forall (M : structure sigma) (f : Formula V A),
+    sat M (f_all_closure f) <-> sat M f.
+Proof.
+    intros M f; unfold f_all_closure.
+    generalize (elements (free_vars f)) as l; induction l; [done |].
+    by cbn; rewrite sat_all, IHl.
+Qed.
+
+Lemma Permutation_NoDup {A} : forall (l1 l2 : list A), l1 ≡ₚ l2 ->
+    NoDup l1 <-> NoDup l2.
+Proof.
+    intros; rewrite !NoDup_ListNoDup.
+    by split; apply Permutation_NoDup.
+Qed.
+
+Lemma sat_neg_ex_closure `{EqDecision V} `{FreeVarsSupportedSatisfaction sigma V (A V)} :
+    forall (M : structure sigma) (f : Formula V A),
+    sat M (f_neg (f_ex_closure f)) <-> sat M (f_neg f).
+Proof.
+    intros. rewrite <- (sat_all_closure M (f_neg f)).
+    apply forall_proper; intro v.
+    unfold f_ex_closure, f_all_closure.
+    transitivity (vsat M (foldr All (f_neg f) (elements (free_vars f))) v).
+    - generalize (elements (free_vars f)) as l; intro l; revert v; induction l; [done |].
+      intro; cbn.
+      rewrite vsat_neg_ex_all, !vsat_all.
+      by apply forall_proper; intro b; apply IHl.
+    - cbn.
+      assert (Heqv : elements (free_vars f) ≡ₚ elements (free_vars f ∪ ∅)).
+      {
+        rewrite elements_disj_union by set_solver.
+        by rewrite elements_empty, app_nil_r.
+      }
+      assert (Hnodup : NoDup (elements (free_vars f))) by apply NoDup_elements.
+      revert Heqv Hnodup.
+      generalize (elements (free_vars f)), (elements (free_vars f ∪ ∅)); intros.
+      revert v; induction Heqv.
+      + done.
+      + intros; cbn; rewrite !vsat_all; apply forall_proper; intro; apply IHHeqv.
+        by eapply NoDup_cons.
+      + intros; cbn.
+        rewrite !NoDup_cons, elem_of_cons in Hnodup; destruct Hnodup as (Hy & Hx & Hl).
+        apply not_or_and in Hy as [Hxy Hy].
+        rewrite !vsat_all; split; intros Hall a; rewrite vsat_all; intro b;
+          rewrite fn_update_comm by done.
+        * by specialize (Hall b); rewrite vsat_all in Hall; apply Hall.
+        * by specialize (Hall b); rewrite vsat_all in Hall; apply Hall.
+      + intro; rewrite IHHeqv1 by done.
+        by apply IHHeqv2; revert Hnodup; apply Permutation_NoDup.
+Qed.
+
+Lemma sat_set_union `{EqDecision V} `{Satisfaction sigma V (A V)} :
+    forall `(M : structure sigma) (Gamma Delta : Ensemble (Formula V A)),
+    sat_set M (Gamma ∪ Delta) <-> sat_set M Gamma /\ sat_set M Delta.
+Proof.
+    split; [intros Hall; split; intros f Hf; apply Hall, elem_of_union |].
+    - by left.
+    - by right.
+    - intros [HGamma HDelta] f; rewrite elem_of_union; intros [Hf | Hf].
+      + by apply HGamma.
+      + by apply HDelta.
+Qed.
+
+Lemma sat_set_singleton `{EqDecision V} `{Satisfaction sigma V (A V)} :
+    forall `(M : structure sigma) (f : Formula V A),
+    sat_set M {[f]} <-> sat M f.
+Proof.
+    split; intros Hsat.
+    - by apply Hsat, elem_of_singleton.
+    - by intro; rewrite elem_of_singleton; intros ->.
 Qed.
 
 Lemma unsatisfiable_set_bot `{EnsuringInhabitation sigma} `{EqDecision V}  `{Satisfaction sigma V (A V)} :
@@ -438,6 +629,36 @@ Proof.
       by set_solver.
 Qed.
 
+Lemma set_sem_ded_by_unsatisfiability_ex_closure `{EnsuringInhabitation sigma} `{EqDecision V}  `{FreeVarsSupportedSatisfaction sigma V (A V)} :
+    forall (Gamma : Ensemble (Formula V A)) (f : Formula V A),
+    set_sem_ded (sigma := sigma) Gamma (f_ex_closure f)
+      <->
+    unsatisfiable_set (sigma := sigma) (Gamma ∪ {[f_neg f]}).
+Proof.
+    intros.
+    rewrite set_sem_ded_by_unsatisfiability; [| by apply ex_closure_statement].
+    unfold unsatisfiable_set, satisfiable_set.
+    apply not_iff_compat, exist_proper; intro M.
+    split; intros Hsat g; rewrite !elem_of_union, !elem_of_singleton; intros [Hg | ->].
+    - by apply Hsat, elem_of_union; left.
+    - by apply sat_neg_ex_closure, Hsat, elem_of_union; right; apply elem_of_singleton.
+    - by apply Hsat, elem_of_union; left.
+    - by apply sat_neg_ex_closure, Hsat, elem_of_union; right; apply elem_of_singleton.
+Qed.
+
+Lemma unsatisfiable_set_eqv  `{EqDecision V}  `{FreeVarsSupportedSatisfaction sigma V (A V)} :
+    forall (Gamma : Ensemble (Formula V A)) (f f' : Formula V A)
+      (Hall : forall (M : structure sigma), sat_set M Gamma -> sat M f <-> sat M f'),
+    unsatisfiable_set (sigma := sigma) (Gamma ∪ {[f]})
+      <->
+    unsatisfiable_set (sigma := sigma) (Gamma ∪ {[f']}).
+Proof.
+    intros; unfold unsatisfiable_set.
+    apply not_iff_compat, exist_proper; intro M.
+    rewrite !sat_set_union, !sat_set_singleton.
+    by split; intros [Hgamma Hf]; (split; [| apply Hall]).
+Qed.
+
 Section sec_formula_eval.
 
 Context
@@ -465,7 +686,7 @@ Definition term_eval (A : structure sigma) : GroundTerm sigma -> support A :=
 
 Lemma vterm_eval_fv :
     forall V (A : structure sigma) (t : VTerm sigma V) (v1 v2 : V -> support A),
-    (forall (x : V), x ∈ free_vars t -> v1 x = v2 x) ->
+    var_equivalent (free_vars t) v1 v2 ->
     vterm_eval A v1 t = vterm_eval A v2 t.
 Proof.
     intros * Heqv; induction t as [| ? ? Hind] using vterm_ind.
@@ -508,8 +729,8 @@ Proof.
     cbn in Heqv.
     rewrite vterm_eval_fv with (t := l) (v2 := v2),
       vterm_eval_fv with (t := r) (v2 := v2); [done |..].
-    - by intros; apply Heqv; set_solver.
-    - by intros; apply Heqv; set_solver.
+    - by intros ? **; apply Heqv; set_solver.
+    - by intros ? **; apply Heqv; set_solver.
 Qed.
 
 Definition rel_vsat_set {V}

@@ -36,6 +36,10 @@ match l with
 | h :: t => f_and h (f_list_and t)
 end.
 
+Lemma f_list_and_unfold `(h : Formula V A) (t : list (Formula V A)) :
+    t <> [] -> f_list_and (h :: t) = f_and h (f_list_and t).
+Proof. by destruct t. Qed.
+
 Definition finite_conjunction_to_formula `(f : FiniteConjunction V A) : Formula V A :=
     f_list_and (get_finite_conjunction f).
 
@@ -55,6 +59,10 @@ match l with
 | [h] => h
 | h :: t => f_or h (f_list_or t)
 end.
+
+Lemma f_list_or_unfold `(h : Formula V A) (t : list (Formula V A)) :
+    t <> [] -> f_list_or (h :: t) = f_or h (f_list_or t).
+Proof. by destruct t. Qed.
 
 Definition finite_disjunction_to_formula `(f : FiniteDisjunction V A) : Formula V A :=
     f_list_or (get_finite_disjunction f).
@@ -78,6 +86,34 @@ end.
 
 Definition statement A `{FreeVars A V} : Ensemble A :=
     fun phi => free_vars phi ≡ ∅.
+
+Definition f_ex_closure `{EqDecision V} `{FreeVars (A V) V}
+    (f : Formula V A) : Formula V A :=
+    foldr f_ex f (elements (free_vars f)).
+
+Lemma ex_closure_statement `{EqDecision V} `{FreeVars (A V) V} :
+    forall (f : Formula V A), f_ex_closure f ∈ statement (Formula V A).
+Proof.
+    intros. unfold f_ex_closure, statement, elem_of, pow_set_elem_of.
+    cut (forall (l : list V), free_vars (foldr f_ex f l) ≡ free_vars f ∖ list_to_set l);
+      [by intros ->; set_solver |].
+    induction l; intros; cbn; [by set_solver |].
+    by rewrite IHl; set_solver.
+Qed.
+
+Definition f_all_closure `{EqDecision V} `{FreeVars (A V) V}
+    (f : Formula V A) : Formula V A :=
+    foldr All f (elements (free_vars f)).
+
+Lemma all_closure_statement `{EqDecision V} `{FreeVars (A V) V} :
+    forall (f : Formula V A), f_all_closure f ∈ statement (Formula V A).
+Proof.
+    intros. unfold f_all_closure, statement, elem_of, pow_set_elem_of.
+    cut (forall (l : list V), free_vars (foldr All f l) ≡ free_vars f ∖ list_to_set l);
+      [by intros ->; set_solver |].
+    induction l; intros; cbn; [by set_solver |].
+    by rewrite IHl; set_solver.
+Qed.
 
 Record signature : Type := {
 symbol : Type;

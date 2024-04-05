@@ -11,8 +11,10 @@ Context
     (sigma : signature).
 
 Lemma vsat_definite_clause :
-    forall `{EqDecision V} (A : structure sigma) (cl : definite_clause sigma V)  (v : V -> support A),
-    vsat A (definite_clause_to_rel_formula cl) v <-> (Forall (fun a => vsat A a v) (get_ra_conjunction (cl_body cl)) -> vsat A (cl_head cl) v).
+    forall `{EqDecision V} (A : structure sigma) (cl : definite_clause sigma V) (v : V -> support A),
+    vsat A (definite_clause_to_rel_formula cl) v
+      <->
+    (Forall (fun a => vsat A a v) (get_ra_conjunction (cl_body cl)) -> vsat A (cl_head cl) v).
 Proof.
     intros; unfold definite_clause_to_rel_formula. setoid_rewrite vsat_impl.
     cut ((vsat A (ra_conjunction_to_rel_formula (cl_body cl)) v
@@ -20,7 +22,50 @@ Proof.
         (Forall (λ a : RelAtom sigma V, vsat A a v) (get_ra_conjunction (cl_body cl)))));
       [by intros -> |].
     unfold ra_conjunction_to_rel_formula; cbn.
-Abort.
+    setoid_rewrite vsat_list_and; rewrite! Forall_forall.
+    split; intros Hall f Hf.
+    - cut (vsat A (Atomic f) v); [done |].
+      by apply Hall, elem_of_list_fmap; eexists.
+    - apply elem_of_list_fmap in Hf as [a  [-> Ha]].
+      by apply Hall.
+Qed.
+
+Lemma vsat_definite_goal :
+    forall `{EqDecision V} (A : structure sigma) `{Inhabited (support A)} (cl : definite_goal sigma V),
+    sat A (definite_goal_to_rel_formula cl)
+      <->
+    exists (v : V -> support A),
+      Forall (fun f => vsat A f v) (get_ra_conjunction (get_definite_goal cl)).
+Proof.
+    intros ? ? A ? [[atoms]]; cbn.
+    unfold definite_goal_to_rel_formula, get_definite_goal, ra_conjunction_to_rel_formula; cbn.
+    rewrite (sat_ex_closure A (f_list_and (map Atomic atoms))).
+    apply exist_proper; intro v.
+    rewrite vsat_list_and, !Forall_forall.
+    split; intros Hall x Hx.
+    - by apply (Hall (Atomic x)), elem_of_list_fmap; eexists.
+    - apply elem_of_list_fmap in Hx as [a [-> Ha]].
+      by apply Hall.
+Qed.
+
+Lemma set_sem_ded_by_unsatisfiability_pgm_query `{EnsuringInhabitation sigma} `{EqDecision V}:
+    forall `(pgm : program sigma V) (q : query sigma V) (pgm_set := list_to_set (map definite_clause_to_rel_formula pgm)),
+    set_sem_ded (sigma := sigma) pgm_set (definite_goal_to_rel_formula q)
+      <->
+    unsatisfiable_set (sigma := sigma) (pgm_set ∪ {[definite_goal_negation_to_rel_formula (negate_definite_goal q)]}).
+Proof.
+    intros; unfold definite_goal_to_rel_formula.
+    rewrite (set_sem_ded_by_unsatisfiability_ex_closure pgm_set).
+    apply unsatisfiable_set_eqv; intros M _.
+    unfold definite_goal_negation_to_rel_formula, finite_disjunction_to_formula.
+    unfold get_definite_goal, ra_conjunction_to_rel_formula; cbn.
+    rewrite sat_neg_list_and; cbn.
+    destruct q; cbn.
+    replace (map f_neg (map Atomic (get_ra_conjunction get_definite_goal)))
+      with (map (f_neg ∘ Atomic) (get_ra_conjunction get_definite_goal)); [done |].
+    generalize (get_ra_conjunction get_definite_goal); induction l; [done |].
+    by cbn; rewrite IHl.
+Qed.
 
 End sec_prolog.
 
