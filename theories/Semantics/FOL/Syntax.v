@@ -1,4 +1,5 @@
 From stdpp Require Import prelude.
+From Coq Require Import FunctionalExtensionality.
 
 From sets Require Import Ensemble Functions.
 
@@ -309,3 +310,46 @@ Arguments mk_ra_conjunction {sigma V%type_scope} get_ra_conjunction%list_scope :
 Arguments get_ra_conjunction {sigma V%type_scope} r : assert.
 
 Arguments ra_conjunction_to_rel_formula {sigma V%type_scope} _ : assert.
+
+Definition vsubstitution sigma V V' : Type := V -> VTerm sigma V'.
+
+Definition substitution sigma V : Type := vsubstitution sigma V V.
+
+Definition ground_substitution sigma V : Type := vsubstitution sigma V False.
+
+Definition subst_id sigma V : substitution sigma V := Var.
+
+Definition term_subst `(theta : vsubstitution sigma V V')
+    : VTerm sigma V -> VTerm sigma V' :=
+    vterm_rect sigma V (fun _ => VTerm sigma V') (fun n _ => vec (VTerm sigma V') n)
+      theta
+      (fun f _ ts' => App f ts')
+      [#]
+      (fun _ _ vt _ vts =>  vt ::: vts).    
+
+Lemma term_subst_app `(theta : vsubstitution sigma  V V') :
+    forall (s : symbol sigma) (ts : vec (VTerm sigma V) (s_arity s)),
+    term_subst theta (App s ts) = App s (vmap (term_subst theta) ts).
+Proof. done. Qed.
+
+Definition subst_comp {V1 V2 V3 sigma}
+    (theta' : vsubstitution sigma  V2 V3) (theta : vsubstitution sigma V1 V2) :
+    vsubstitution sigma V1 V3 := term_subst theta' ∘ theta.
+
+Lemma term_subst_comp  {V1 V2 V3 sigma}
+    (theta' : vsubstitution V2 sigma V3) (theta : vsubstitution V1 sigma V2) :
+    term_subst (subst_comp theta' theta) = term_subst theta' ∘ term_subst theta.
+Proof.
+  extensionality t.
+  induction t as [| f ts Hts] using vterm_ind; [done |].
+  rewrite Forall_forall in Hts.
+  unfold compose; rewrite! term_subst_app.
+  f_equal.
+  apply vec_to_list_inj2; rewrite !vec_to_list_map.
+  rewrite <- list_fmap_compose.
+  apply list_fmap_ext.
+  by intros; eapply Hts, elem_of_list_lookup_2.
+Qed.
+
+Lemma subst_comp_id_l {V1 V2 sigma} (theta : vsubstitution V1 sigma V2) :
+    
