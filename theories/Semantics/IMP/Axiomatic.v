@@ -13,12 +13,12 @@ Inductive EAExp (L V : Type) : Type :=
     | EMinus : EAExp L V -> EAExp L V -> EAExp L V
     | EMul : EAExp L V -> EAExp L V -> EAExp L V.
 
-Arguments LVar {L V}%type_scope _ : assert.
-Arguments EAVal {L V}%type_scope _%Z_scope : assert.
-Arguments EVar {L V}%type_scope _%nat_scope : assert.
-Arguments EPlus {L V}%type_scope _ _ : assert.
-Arguments EMinus {L V}%type_scope _ _ : assert.
-Arguments EMul {L V}%type_scope _ _ : assert.
+Arguments LVar {L V}%_type_scope _ : assert.
+Arguments EAVal {L V}%_type_scope _%_Z_scope : assert.
+Arguments EVar {L V}%_type_scope _%_nat_scope : assert.
+Arguments EPlus {L V}%_type_scope _ _ : assert.
+Arguments EMinus {L V}%_type_scope _ _ : assert.
+Arguments EMul {L V}%_type_scope _ _ : assert.
 
 Inductive EBExp (L V : Type) : Type :=
     | EBVal : bool -> EBExp L V
@@ -30,13 +30,13 @@ Inductive EBExp (L V : Type) : Type :=
     | Forall : V -> EBExp L V -> EBExp L V
     .
 
-Arguments EBVal {L V}%type_scope _%bool_scope : assert.
-Arguments EAEq {L V}%type_scope _ _ : assert.
-Arguments EALe {L V}%type_scope _ _ : assert.
-Arguments ENot {L V}%type_scope _ : assert.
-Arguments EAnd {L V}%type_scope _ _ : assert.
-Arguments EOr {L V}%type_scope _ _ : assert.
-Arguments Forall {L V}%type_scope _ _ : assert.
+Arguments EBVal {L V}%_type_scope _%_bool_scope : assert.
+Arguments EAEq {L V}%_type_scope _ _ : assert.
+Arguments EALe {L V}%_type_scope _ _ : assert.
+Arguments ENot {L V}%_type_scope _ : assert.
+Arguments EAnd {L V}%_type_scope _ _ : assert.
+Arguments EOr {L V}%_type_scope _ _ : assert.
+Arguments Forall {L V}%_type_scope _ _ : assert.
 
 Section sec_axiomatic.
 

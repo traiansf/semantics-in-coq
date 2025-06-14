@@ -28,21 +28,21 @@ Inductive Cmd : Type :=
 
 End sec_syntax.
 
-Arguments AVal {L}%type_scope _%Z_scope : assert.
-Arguments Var {L}%type_scope _ : assert.
-Arguments Plus {L}%type_scope _ _ : assert.
-Arguments Minus {L}%type_scope _ _ : assert.
-Arguments Mul {L}%type_scope _ _ : assert.
+Arguments AVal {L}%_type_scope _%_Z_scope : assert.
+Arguments Var {L}%_type_scope _ : assert.
+Arguments Plus {L}%_type_scope _ _ : assert.
+Arguments Minus {L}%_type_scope _ _ : assert.
+Arguments Mul {L}%_type_scope _ _ : assert.
 
-Arguments BVal {L}%type_scope _%bool_scope : assert.
-Arguments AEq {L}%type_scope _ _ : assert.
-Arguments ALe {L}%type_scope _ _ : assert.
-Arguments Not {L}%type_scope _ : assert.
-Arguments And {L}%type_scope _ _ : assert.
-Arguments Or {L}%type_scope _ _ : assert.
+Arguments BVal {L}%_type_scope _%_bool_scope : assert.
+Arguments AEq {L}%_type_scope _ _ : assert.
+Arguments ALe {L}%_type_scope _ _ : assert.
+Arguments Not {L}%_type_scope _ : assert.
+Arguments And {L}%_type_scope _ _ : assert.
+Arguments Or {L}%_type_scope _ _ : assert.
 
-Arguments Skip {L}%type_scope : assert.
-Arguments Asgn {L}%type_scope _ _ : assert.
-Arguments Seq {L}%type_scope _ _ : assert.
-Arguments If {L}%type_scope _ _ _ : assert.
-Arguments While {L}%type_scope _ _ : assert.
+Arguments Skip {L}%_type_scope : assert.
+Arguments Asgn {L}%_type_scope _ _ : assert.
+Arguments Seq {L}%_type_scope _ _ : assert.
+Arguments If {L}%_type_scope _ _ _ : assert.
+Arguments While {L}%_type_scope _ _ : assert.
