@@ -1,4 +1,4 @@
--Q theories/Semantics Semantics
+-R theories/Semantics Semantics
 
 -arg -w -arg -future-coercion-class-field
 
